@@ -1,0 +1,23 @@
+[Unit]
+Description=TruckerWorldMP Discord Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=truckerworldmp
+Group=truckerworldmp
+WorkingDirectory=/opt/truckerworldmp-bot
+ExecStart=/opt/truckerworldmp-bot/.venv/bin/python /opt/truckerworldmp-bot/main.py
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/truckerworldmp-bot/data /opt/truckerworldmp-bot/logs
+
+[Install]
+WantedBy=multi-user.target
+
