@@ -78,7 +78,12 @@ class TruckerWorldBot(commands.Bot):
         if message.author.bot or not isinstance(message.channel, discord.TextChannel):
             return
         ticket = await self.database.ticket_by_channel(message.channel.id)
-        if not ticket or ticket.status != "open" or not ticket.platform_ticket_id:
+        # The platform owns the authoritative support lifecycle. A website-side
+        # status change can legitimately happen before the local Discord ticket
+        # record is updated (for example while a close/reopen action crosses the
+        # message outbox). Always offer mapped channel messages to the API and
+        # let it reject tickets that are actually closed.
+        if not ticket or not ticket.platform_ticket_id:
             return
         body = message.content.strip()
         if not body and message.attachments:
@@ -102,10 +107,17 @@ class TruckerWorldBot(commands.Bot):
             )
             try:
                 await message.add_reaction("\u26a0\ufe0f")
-                await message.author.send(
-                    "Your message remains visible in Discord, but it could not be synchronized to My Support. "
-                    "Make sure this Discord account is linked to TWMP, then contact a platform administrator if the warning remains."
-                )
+                if error.code == "SUPPORT_CLOSED":
+                    notice = (
+                        "This ticket is closed, so your Discord message was not added to My Support. "
+                        "Request reopening from My Support within the 20-day window before continuing the conversation."
+                    )
+                else:
+                    notice = (
+                        "Your message remains visible in Discord, but it could not be synchronized to My Support. "
+                        "Make sure this Discord account is linked to TWMP, then contact a platform administrator if the warning remains."
+                    )
+                await message.author.send(notice)
             except discord.HTTPException:
                 pass
 
