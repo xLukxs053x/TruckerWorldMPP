@@ -96,7 +96,7 @@ class Database:
 
     def _connection(self) -> aiosqlite.Connection:
         if self.connection is None:
-            raise RuntimeError("Database.start() wurde noch nicht aufgerufen.")
+            raise RuntimeError("Database.start() has not been called yet.")
         return self.connection
 
     async def get_guild_settings(self, guild_id: int) -> GuildSettings:
@@ -109,7 +109,7 @@ class Database:
 
     async def set_guild_value(self, guild_id: int, field: str, value: int | None) -> GuildSettings:
         if field not in self.GUILD_FIELDS:
-            raise ValueError(f"Unbekanntes Konfigurationsfeld: {field}")
+            raise ValueError(f"Unknown configuration field: {field}")
         connection = self._connection()
         timestamp = datetime.now(timezone.utc).isoformat()
         async with self._write_lock:

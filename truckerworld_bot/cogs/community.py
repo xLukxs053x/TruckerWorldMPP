@@ -16,45 +16,45 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
-class CommunityCog(commands.GroupCog, group_name="ticket", group_description="Discord-Supporttickets"):
+class CommunityCog(commands.GroupCog, group_name="ticket", group_description="Discord support tickets"):
     def __init__(self, bot: TruckerWorldBot) -> None:
         self.bot = bot
 
-    @app_commands.command(name="erstellen", description="Erstellt einen privaten Supportkanal.")
+    @app_commands.command(name="create", description="Creates a private support channel.")
     @app_commands.guild_only()
     @app_commands.checks.cooldown(1, 15.0, key=lambda interaction: (interaction.guild_id, interaction.user.id))
     async def ticket_create(self, interaction: discord.Interaction) -> None:
         await create_ticket(interaction, self.bot)
 
-    @app_commands.command(name="schliessen", description="Schließt das aktuelle Supportticket.")
+    @app_commands.command(name="close", description="Closes the current support ticket.")
     @app_commands.guild_only()
     async def ticket_close(self, interaction: discord.Interaction) -> None:
         await close_ticket(interaction, self.bot)
 
-    @app_commands.command(name="panel", description="Sendet das Ticket-Panel in diesen Kanal.")
+    @app_commands.command(name="panel", description="Sends the ticket panel to this channel.")
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)
     @app_commands.checks.has_permissions(manage_guild=True)
     async def ticket_panel(self, interaction: discord.Interaction) -> None:
         embed = base_embed(
             "TruckerWorldMP Support",
-            "Du brauchst Hilfe mit deinem Account, dem Launcher, einem Download oder dem Multiplayer? "
-            "Erstelle hier ein privates Ticket. Bitte öffne nur ein Ticket gleichzeitig.",
+            "Need help with your account, the launcher, a download, or multiplayer? "
+            "Create a private ticket here. Please open only one ticket at a time.",
         )
         embed.add_field(
-            name="Vor dem Erstellen",
-            value="Beschreibe dein Problem genau und halte Fehlermeldungen oder Screenshots bereit.",
+            name="Before creating a ticket",
+            value="Describe the problem precisely and have any error messages or screenshots ready.",
             inline=False,
         )
         embed.add_field(
-            name="Sicherheit",
-            value="Sende niemals Passwörter, Login-Cookies, Bot-Tokens oder andere Zugangsdaten.",
+            name="Security",
+            value="Never send passwords, login cookies, bot tokens, or other credentials.",
             inline=False,
         )
-        await interaction.channel.send(
+        await interaction.channel.send(  # type: ignore[union-attr]
             embed=branded(embed, self.bot.settings.twmp_logo_url), view=TicketPanelView(self.bot)
-        )  # type: ignore[union-attr]
-        await interaction.response.send_message("Ticket-Panel gesendet.", ephemeral=True)
+        )
+        await interaction.response.send_message("Ticket panel sent.", ephemeral=True)
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member) -> None:
@@ -63,24 +63,26 @@ class CommunityCog(commands.GroupCog, group_name="ticket", group_description="Di
             role = member.guild.get_role(settings.auto_role_id)
             if role and member.guild.me and role < member.guild.me.top_role:
                 try:
-                    await member.add_roles(role, reason="TruckerWorldMP Auto-Rolle")
+                    await member.add_roles(role, reason="TruckerWorldMP automatic member role")
                 except discord.HTTPException:
-                    LOGGER.exception("Auto-Rolle konnte %s nicht zugewiesen werden", member)
+                    LOGGER.exception("Could not assign the automatic role to %s", member)
         channel = member.guild.get_channel(settings.welcome_channel_id) if settings.welcome_channel_id else None
         if isinstance(channel, discord.TextChannel):
             embed = base_embed(
-                f"Willkommen bei TruckerWorldMP, {member.display_name}!",
-                "Schön, dass du dabei bist. Schau dir die Regeln an, verbinde deinen Discord-Account auf der Website und entdecke die nächsten Convoys.",
+                f"Welcome to TruckerWorldMP, {member.display_name}!",
+                "Great to have you with us. Read the rules, connect your Discord account on the website, "
+                "and discover the next convoys.",
             )
             embed.set_thumbnail(url=member.display_avatar.url)
             embed.add_field(name="Website", value=self.bot.settings.twmp_web_url)
             embed.add_field(
-                name="Mitglied", value=f"Du bist Nummer **{member.guild.member_count}** auf diesem Discord."
+                name="Community member",
+                value=f"You are member **#{member.guild.member_count}** in this Discord community.",
             )
             try:
                 await channel.send(content=member.mention, embed=branded(embed, self.bot.settings.twmp_logo_url))
             except discord.HTTPException:
-                LOGGER.exception("Willkommensnachricht konnte nicht gesendet werden")
+                LOGGER.exception("Could not send welcome message")
         await self._member_log(member, joined=True)
 
     @commands.Cog.listener()
@@ -88,14 +90,12 @@ class CommunityCog(commands.GroupCog, group_name="ticket", group_description="Di
         settings = await self.bot.database.get_guild_settings(member.guild.id)
         channel = member.guild.get_channel(settings.leave_channel_id) if settings.leave_channel_id else None
         if isinstance(channel, discord.TextChannel):
-            embed = base_embed(
-                "Mitglied hat den Server verlassen", f"**{member}** war Teil der TruckerWorldMP-Community."
-            )
+            embed = base_embed("A member left the guild", f"**{member}** was part of the TruckerWorldMP community.")
             embed.set_thumbnail(url=member.display_avatar.url)
             try:
                 await channel.send(embed=branded(embed, self.bot.settings.twmp_logo_url))
             except discord.HTTPException:
-                LOGGER.exception("Abschiedsnachricht konnte nicht gesendet werden")
+                LOGGER.exception("Could not send farewell message")
         await self._member_log(member, joined=False)
 
     async def _member_log(self, member: discord.Member, *, joined: bool) -> None:
@@ -103,10 +103,10 @@ class CommunityCog(commands.GroupCog, group_name="ticket", group_description="Di
         channel = member.guild.get_channel(settings.log_channel_id) if settings.log_channel_id else None
         if not isinstance(channel, discord.TextChannel):
             return
-        embed = base_embed("Mitglied beigetreten" if joined else "Mitglied gegangen")
-        embed.add_field(name="Nutzer", value=f"{member} (`{member.id}`)", inline=False)
-        embed.add_field(name="Account erstellt", value=discord.utils.format_dt(member.created_at, "R"))
+        embed = base_embed("Member joined" if joined else "Member left")
+        embed.add_field(name="User", value=f"{member} (`{member.id}`)", inline=False)
+        embed.add_field(name="Account created", value=discord.utils.format_dt(member.created_at, "R"))
         try:
             await channel.send(embed=embed)
         except discord.HTTPException:
-            LOGGER.exception("Mitgliederprotokoll konnte nicht gesendet werden")
+            LOGGER.exception("Could not send member log entry")

@@ -22,7 +22,7 @@ def _ticket_name(member: discord.Member) -> str:
 async def create_ticket(interaction: discord.Interaction, bot: TruckerWorldBot) -> None:
     if not interaction.guild or not isinstance(interaction.user, discord.Member):
         await interaction.response.send_message(
-            embed=error_embed("Tickets sind nur auf dem Server verfügbar."), ephemeral=True
+            embed=error_embed("Tickets are only available in a Discord guild."), ephemeral=True
         )
         return
     await interaction.response.defer(ephemeral=True, thinking=True)
@@ -32,7 +32,7 @@ async def create_ticket(interaction: discord.Interaction, bot: TruckerWorldBot) 
     if not isinstance(category, discord.CategoryChannel) or support_role is None:
         await interaction.followup.send(
             embed=error_embed(
-                "Das Ticketsystem ist noch nicht vollständig eingerichtet. Nutze `/admin kategorie` und `/admin rolle`."
+                "The ticket system is not fully configured yet. Use `/admin category` and `/admin role`."
             ),
             ephemeral=True,
         )
@@ -43,7 +43,7 @@ async def create_ticket(interaction: discord.Interaction, bot: TruckerWorldBot) 
         existing_channel = interaction.guild.get_channel(existing.channel_id)
         if isinstance(existing_channel, discord.TextChannel):
             await interaction.followup.send(
-                f"Du hast bereits ein offenes Ticket: {existing_channel.mention}", ephemeral=True
+                f"You already have an open ticket: {existing_channel.mention}", ephemeral=True
             )
             return
         await bot.database.close_ticket(existing.channel_id)
@@ -51,7 +51,7 @@ async def create_ticket(interaction: discord.Interaction, bot: TruckerWorldBot) 
     me = interaction.guild.me
     if me is None:
         await interaction.followup.send(
-            embed=error_embed("Der Bot-Servereintrag konnte nicht geladen werden."), ephemeral=True
+            embed=error_embed("The bot member could not be loaded for this guild."), ephemeral=True
         )
         return
     overwrites = {
@@ -71,26 +71,24 @@ async def create_ticket(interaction: discord.Interaction, bot: TruckerWorldBot) 
             _ticket_name(interaction.user),
             category=category,
             overwrites=overwrites,
-            topic=f"TruckerWorldMP Support · Nutzer {interaction.user.id}",
-            reason=f"Supportticket von {interaction.user}",
+            topic=f"TruckerWorldMP Support · User {interaction.user.id}",
+            reason=f"Support ticket created by {interaction.user}",
         )
         try:
             ticket = await bot.database.create_ticket(interaction.guild.id, channel.id, interaction.user.id)
         except Exception:
-            await channel.delete(reason="Ticket-Datenbankeintrag fehlgeschlagen")
+            await channel.delete(reason="Ticket database entry failed")
             raise
     except discord.HTTPException:
-        LOGGER.exception("Ticketkanal konnte nicht erstellt werden")
-        await interaction.followup.send(
-            embed=error_embed("Der Ticketkanal konnte nicht erstellt werden."), ephemeral=True
-        )
+        LOGGER.exception("Could not create ticket channel")
+        await interaction.followup.send(embed=error_embed("The ticket channel could not be created."), ephemeral=True)
         return
 
     embed = base_embed(
-        f"Supportticket #{ticket.id}",
-        "Beschreibe dein Anliegen möglichst genau. Teile Passwörter, Tokens oder andere Zugangsdaten niemals im Ticket.",
+        f"Support Ticket #{ticket.id}",
+        "Describe your request as precisely as possible. Never share passwords, tokens, or other credentials in a ticket.",
     )
-    embed.add_field(name="Erstellt von", value=interaction.user.mention)
+    embed.add_field(name="Created by", value=interaction.user.mention)
     embed.add_field(name="Support", value=support_role.mention)
     await channel.send(
         content=f"{interaction.user.mention} {support_role.mention}",
@@ -99,18 +97,18 @@ async def create_ticket(interaction: discord.Interaction, bot: TruckerWorldBot) 
         allowed_mentions=discord.AllowedMentions(users=True, roles=True, everyone=False),
     )
     await interaction.followup.send(
-        embed=success_embed("Ticket erstellt", f"Dein Ticket ist {channel.mention}."), ephemeral=True
+        embed=success_embed("Ticket created", f"Your ticket is {channel.mention}."), ephemeral=True
     )
 
 
 async def close_ticket(interaction: discord.Interaction, bot: TruckerWorldBot) -> None:
     if not interaction.guild or not isinstance(interaction.channel, discord.TextChannel):
-        await interaction.response.send_message(embed=error_embed("Das ist kein Ticketkanal."), ephemeral=True)
+        await interaction.response.send_message(embed=error_embed("This is not a ticket channel."), ephemeral=True)
         return
     ticket = await bot.database.ticket_by_channel(interaction.channel.id)
     if not ticket or ticket.status != "open":
         await interaction.response.send_message(
-            embed=error_embed("Für diesen Kanal ist kein offenes Ticket registriert."), ephemeral=True
+            embed=error_embed("There is no open ticket registered for this channel."), ephemeral=True
         )
         return
     settings = await bot.database.get_guild_settings(interaction.guild.id)
@@ -124,13 +122,13 @@ async def close_ticket(interaction: discord.Interaction, bot: TruckerWorldBot) -
     )
     if not can_close:
         await interaction.response.send_message(
-            embed=error_embed("Dieses Ticket darfst du nicht schließen."), ephemeral=True
+            embed=error_embed("You are not allowed to close this ticket."), ephemeral=True
         )
         return
 
     await interaction.response.defer(ephemeral=True, thinking=True)
     if not await bot.database.close_ticket(interaction.channel.id):
-        await interaction.followup.send(embed=error_embed("Das Ticket wurde bereits geschlossen."), ephemeral=True)
+        await interaction.followup.send(embed=error_embed("This ticket has already been closed."), ephemeral=True)
         return
     owner = interaction.guild.get_member(ticket.owner_id)
     try:
@@ -139,16 +137,14 @@ async def close_ticket(interaction: discord.Interaction, bot: TruckerWorldBot) -
                 owner, view_channel=True, send_messages=False, read_message_history=True
             )
         await interaction.channel.edit(
-            name=f"geschlossen-{ticket.id}"[:100],
-            topic=f"Geschlossen von {interaction.user} · Ticket #{ticket.id}",
-            reason=f"Ticket geschlossen von {interaction.user}",
+            name=f"closed-{ticket.id}"[:100],
+            topic=f"Closed by {interaction.user} · Ticket #{ticket.id}",
+            reason=f"Ticket closed by {interaction.user}",
         )
-        await interaction.channel.send(
-            embed=success_embed("Ticket geschlossen", f"Geschlossen von {interaction.user.mention}.")
-        )
+        await interaction.channel.send(embed=success_embed("Ticket closed", f"Closed by {interaction.user.mention}."))
     except discord.HTTPException:
-        LOGGER.exception("Ticketkanal %d konnte nicht vollständig geschlossen werden", interaction.channel.id)
-    await interaction.followup.send("Ticket geschlossen.", ephemeral=True)
+        LOGGER.exception("Ticket channel %d could not be fully closed", interaction.channel.id)
+    await interaction.followup.send("Ticket closed.", ephemeral=True)
 
 
 class TicketPanelView(discord.ui.View):
@@ -157,7 +153,7 @@ class TicketPanelView(discord.ui.View):
         self.bot = bot
 
     @discord.ui.button(
-        label="Ticket erstellen", emoji="🎫", style=discord.ButtonStyle.primary, custom_id="twmp:ticket:create"
+        label="Create Ticket", emoji="🎫", style=discord.ButtonStyle.primary, custom_id="twmp:ticket:create"
     )
     async def create_button(
         self, interaction: discord.Interaction, _button: discord.ui.Button[TicketPanelView]
@@ -171,7 +167,7 @@ class TicketCloseView(discord.ui.View):
         self.bot = bot
 
     @discord.ui.button(
-        label="Ticket schließen", emoji="🔒", style=discord.ButtonStyle.danger, custom_id="twmp:ticket:close"
+        label="Close Ticket", emoji="🔒", style=discord.ButtonStyle.danger, custom_id="twmp:ticket:close"
     )
     async def close_button(self, interaction: discord.Interaction, _button: discord.ui.Button[TicketCloseView]) -> None:
         await close_ticket(interaction, self.bot)

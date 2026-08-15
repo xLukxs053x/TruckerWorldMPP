@@ -21,7 +21,7 @@ def _bool(value: str | None, default: bool) -> bool:
         return True
     if normalized in {"0", "false", "no", "off", "nein"}:
         return False
-    raise ConfigError(f"Ungültiger Wahrheitswert: {value!r}")
+    raise ConfigError(f"Invalid boolean value: {value!r}")
 
 
 def _integer(name: str, default: int, minimum: int, maximum: int) -> int:
@@ -29,9 +29,9 @@ def _integer(name: str, default: int, minimum: int, maximum: int) -> int:
     try:
         value = int(raw)
     except ValueError as error:
-        raise ConfigError(f"{name} muss eine ganze Zahl sein.") from error
+        raise ConfigError(f"{name} must be an integer.") from error
     if not minimum <= value <= maximum:
-        raise ConfigError(f"{name} muss zwischen {minimum} und {maximum} liegen.")
+        raise ConfigError(f"{name} must be between {minimum} and {maximum}.")
     return value
 
 
@@ -40,7 +40,7 @@ def _optional_snowflake(name: str) -> int | None:
     if not raw:
         return None
     if not re.fullmatch(r"\d{15,24}", raw):
-        raise ConfigError(f"{name} muss eine gültige Discord-ID sein.")
+        raise ConfigError(f"{name} must be a valid Discord ID.")
     return int(raw)
 
 
@@ -63,6 +63,7 @@ class Settings:
     twmp_api_url: str
     twmp_web_url: str
     twmp_logo_url: str
+    twmp_primary_server_slug: str
     database_path: Path
     log_level: str
     command_sync_on_start: bool
@@ -77,22 +78,25 @@ class Settings:
         token = os.getenv("DISCORD_BOT_TOKEN", "").strip()
         client_id_raw = os.getenv("DISCORD_CLIENT_ID", "").strip()
         if not token:
-            raise ConfigError("DISCORD_BOT_TOKEN fehlt in .env.")
+            raise ConfigError("DISCORD_BOT_TOKEN is missing from .env.")
         if token.count(".") < 2:
-            raise ConfigError("DISCORD_BOT_TOKEN hat kein gültiges Bot-Token-Format.")
+            raise ConfigError("DISCORD_BOT_TOKEN does not have a valid bot token format.")
         if not re.fullmatch(r"\d{15,24}", client_id_raw):
-            raise ConfigError("DISCORD_CLIENT_ID fehlt oder ist ungültig.")
+            raise ConfigError("DISCORD_CLIENT_ID is missing or invalid.")
 
         token_client_id = _application_id_from_token(token)
         if token_client_id and token_client_id != client_id_raw:
-            raise ConfigError("DISCORD_CLIENT_ID und Bot-Token gehören nicht zur gleichen Anwendung.")
+            raise ConfigError("DISCORD_CLIENT_ID and the bot token do not belong to the same application.")
 
         api_url = os.getenv("TWMP_API_URL", "https://truckerworldmp.com/api/v1").strip().rstrip("/")
         web_url = os.getenv("TWMP_WEB_URL", "https://truckerworldmp.com").strip().rstrip("/")
         if not api_url.startswith(("http://", "https://")):
-            raise ConfigError("TWMP_API_URL muss eine HTTP(S)-Adresse sein.")
+            raise ConfigError("TWMP_API_URL must be an HTTP(S) URL.")
         if not web_url.startswith(("http://", "https://")):
-            raise ConfigError("TWMP_WEB_URL muss eine HTTP(S)-Adresse sein.")
+            raise ConfigError("TWMP_WEB_URL must be an HTTP(S) URL.")
+        primary_server_slug = os.getenv("TWMP_PRIMARY_SERVER_SLUG", "europe-1").strip().lower()
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,99}", primary_server_slug):
+            raise ConfigError("TWMP_PRIMARY_SERVER_SLUG must be a valid server slug.")
 
         database_path = Path(os.getenv("BOT_DATABASE_PATH", "data/truckerworldmp-bot.db").strip())
         return cls(
@@ -103,6 +107,7 @@ class Settings:
             twmp_api_url=api_url,
             twmp_web_url=web_url,
             twmp_logo_url=os.getenv("TWMP_LOGO_URL", f"{web_url}/twmp-icon.png").strip(),
+            twmp_primary_server_slug=primary_server_slug,
             database_path=database_path,
             log_level=os.getenv("LOG_LEVEL", "INFO").strip().upper(),
             command_sync_on_start=_bool(os.getenv("COMMAND_SYNC_ON_START"), True),

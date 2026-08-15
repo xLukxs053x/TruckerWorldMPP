@@ -1,116 +1,178 @@
 # TruckerWorldMP Discord Bot
 
-Der Python-Bot verbindet den Discord-Server mit der vorhandenen TruckerWorldMP-Plattform in
-`D:\programmieren\TruckerWorldMP`. Website, Launcher und API bleiben die maßgebliche Datenquelle; der Bot liest die
-öffentlichen `/api/v1`-Endpunkte und greift nicht direkt auf MongoDB oder Benutzer-Sitzungen zu.
+The Python bot connects the TruckerWorldMP Discord community to the existing website, launcher, and platform API.
+The public `/api/v1` endpoints remain the source of truth; the bot never connects directly to the platform's MongoDB
+database and does not use member access tokens.
 
-## Funktionsumfang
+The complete bot interface is in English. `Europe 1` (`europe-1`) is the configured primary game server. The
+Simulation Lab is deliberately excluded from presence, status output, automatic server announcements, and convoy
+selection.
 
-- Live-Status, Spielerzahlen und Details aller Gameserver
-- kommende Convoys, News, öffentliche TWMP-Profile und VTC-Suche
-- aktuelle Launcher-Version mit Download, Prüfsumme und Release Notes
-- automatische Bot-Präsenz sowie Status-, News- und Convoy-Meldungen
-- Begrüßung, Abschied, Auto-Rolle und zentraler Discord-Protokollkanal
-- persistentes, privates Ticketsystem mit Support-Rolle und Ticket-Kategorie
-- lokale Discord-Verwarnungen, Timeout, Timeout-Aufhebung und Nachrichtenbereinigung
-- komplette Einrichtung pro Discord-Server über `/admin`
-- SQLite mit WAL-Modus für Konfiguration, Tickets und Discord-Verwarnungen
+## Features
 
-## Schnellstart unter Windows
+- live Europe 1 status, queue, game version, and player count
+- upcoming Europe 1 convoys, news, public TWMP profiles, and VTC search
+- latest launcher release with download link, checksum, and release notes
+- automatic Europe 1 presence and server status announcements
+- automatic news and Europe 1 convoy announcements
+- welcome messages, farewell messages, automatic member role, and Discord logs
+- persistent private ticket system with a support role and ticket category
+- Discord warnings, timeouts, timeout removal, and message cleanup
+- complete per-guild setup through `/admin`
+- SQLite with WAL mode for guild settings, tickets, and Discord warnings
 
-Python 3.10 oder neuer wird benötigt. Die echte `.env` liegt bereits lokal vor und wird durch `.gitignore` nicht
-versioniert.
+## Requirements
+
+- Python 3.10 or newer
+- a Discord application with a bot user
+- `Server Members Intent` enabled in the Discord Developer Portal
+- access to `https://truckerworldmp.com/api/v1`
+
+`Message Content Intent` is not required.
+
+## Windows installation
 
 ```powershell
 cd D:\programmieren\TruckerWorldMPP
 .\start.ps1 -Install
 ```
 
-Spätere Starts benötigen nur noch:
+Later starts only require:
 
 ```powershell
 .\start.ps1
 ```
 
-Alternativ manuell:
+## Ubuntu installation
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe main.py
+When the project is stored in `/home/lukas/TruckerWorldMPP`:
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip
+
+cd ~/TruckerWorldMPP
+python3 -m venv .venv
+./.venv/bin/python -m pip install --upgrade pip
+./.venv/bin/python -m pip install -r requirements.txt
+chmod 600 .env
+./.venv/bin/python main.py
 ```
+
+The included helper can also start the bot:
+
+```bash
+cd ~/TruckerWorldMPP
+chmod +x start.sh
+./start.sh
+```
+
+Do not use `/opt/truckerworldmp-bot` unless the project was actually copied there. Virtual environments created on
+Windows cannot be reused on Linux; always create `.venv` again on the target machine.
 
 ## Discord Developer Portal
 
-Unter **Bot → Privileged Gateway Intents** muss `Server Members Intent` aktiviert sein, damit Willkommen,
-Abschied und Auto-Rolle funktionieren. `Message Content Intent` ist nicht erforderlich und bleibt aus.
+Enable `Server Members Intent` under **Bot → Privileged Gateway Intents**. Under
+**Installation → Guild Install**, use the `bot` and `applications.commands` scopes.
 
-Unter **Installation → Guild Install** werden die Scopes `bot` und `applications.commands` verwendet. Der Bot benötigt:
+The bot needs these permissions:
 
-- Kanäle ansehen, Nachrichten senden, Links einbetten, Dateien anhängen und Nachrichtenverlauf lesen
-- Kanäle verwalten für private Tickets
-- Nachrichten verwalten für `/mod loeschen`
-- Mitglieder moderieren für Discord-Timeouts
+- View Channels, Send Messages, Embed Links, Attach Files, and Read Message History
+- Manage Channels for private tickets
+- Manage Messages for `/mod clear`
+- Moderate Members for Discord timeouts
 
-Der passende Installationslink wird nach der ersten Installation auch mit `/admin einladung` ausgegeben. Für schnelle
-Command-Updates während der Einrichtung kann `DISCORD_GUILD_ID` auf die ID des Testservers gesetzt werden. Ohne diese
-ID werden Commands global synchronisiert; Discord kann globale Änderungen verzögert ausrollen.
+The bot can generate the correct installation link with `/admin invite`.
 
-## Ersteinrichtung auf dem Discord-Server
+## Initial Discord setup
 
-Nach der Bot-Installation führt ein Administrator diese Befehle aus:
+After installing the bot, a guild administrator should run:
 
 ```text
-/admin kanal bereich:willkommen kanal:#willkommen
-/admin kanal bereich:abschied kanal:#abschied
-/admin kanal bereich:protokoll kanal:#bot-log
-/admin kanal bereich:ankuendigungen kanal:#ankuendigungen
-/admin rolle bereich:support rolle:@Support
-/admin rolle bereich:auto rolle:@Mitglied
-/admin kategorie kategorie:Supporttickets
-/admin ticket-panel kanal:#support
-/admin anzeigen
+/admin channel section:welcome channel:#welcome
+/admin channel section:farewell channel:#farewell
+/admin channel section:logs channel:#bot-log
+/admin channel section:announcements channel:#announcements
+/admin role section:support role:@Support
+/admin role section:automatic role:@Member
+/admin category category:Support Tickets
+/admin ticket-panel channel:#support
+/admin show
 ```
 
-Die Bot-Rolle muss in der Discord-Rollenliste über der Auto-Rolle und über moderierten Mitgliederrollen stehen.
-Ein Ticketkanal wird nicht automatisch gelöscht: Beim Schließen bleibt er für Support-Mitarbeiter lesbar und kann
-nach Dokumentation manuell entfernt werden.
+The bot role must be above the automatic member role and above any member roles the bot needs to moderate.
+Closing a ticket does not delete its channel. The closed channel remains available to support staff until it is
+manually archived or deleted.
 
-## Befehle
+## Commands
 
-`/twmp` bietet `status`, `server`, `convoys`, `news`, `profil`, `vtc`, `download`, `links` und `hilfe`.
+### `/twmp`
 
-`/ticket` bietet `erstellen`, `schliessen` und für Administratoren `panel`.
+- `/twmp status` — live Europe 1 status and player count
+- `/twmp server` — detailed Europe 1 information
+- `/twmp convoys` — upcoming Europe 1 convoys
+- `/twmp news` — latest platform news
+- `/twmp profile` — public profile by TWMP ID
+- `/twmp vtc` — VTC lookup
+- `/twmp download` — latest launcher release
+- `/twmp links` — important platform links
+- `/twmp help` — command overview
 
-`/mod` bietet `warnung`, `warnungen`, `timeout`, `freigeben` und `loeschen`. Discord-Rechte und Rollenhierarchie werden
-vor jeder Aktion geprüft. Diese Discord-Verwarnungen sind bewusst getrennt von den Plattform-Strafen der Website, weil
-die vorhandene API keinen allgemeinen Bot-Service-Login für administrative Schreibzugriffe bereitstellt.
+### `/ticket`
 
-`/admin` bietet `anzeigen`, `kanal`, `rolle`, `kategorie`, `zuruecksetzen`, `ticket-panel` und `einladung`.
+- `/ticket create`
+- `/ticket close`
+- `/ticket panel` — requires Manage Guild
 
-## `.env`
+### `/mod`
 
-Die vollständige Vorlage steht in `.env.example`.
+- `/mod warn`
+- `/mod warnings`
+- `/mod timeout`
+- `/mod untimeout`
+- `/mod clear`
 
-| Variable | Zweck |
+Discord permissions and role hierarchy are checked before every moderation action. Discord warnings are intentionally
+separate from platform punishments because the current platform API does not provide a general administrative bot
+service login.
+
+### `/admin`
+
+- `/admin show`
+- `/admin channel`
+- `/admin role`
+- `/admin category`
+- `/admin reset`
+- `/admin ticket-panel`
+- `/admin invite`
+
+## Environment variables
+
+The complete secret-free template is available in `.env.example`.
+
+| Variable | Purpose |
 | --- | --- |
-| `DISCORD_CLIENT_ID` | Öffentliche Anwendungs-ID |
-| `DISCORD_BOT_TOKEN` | Geheimes Bot-Token für Gateway und Discord-API |
-| `DISCORD_CLIENT_SECRET` | Für diesen Bot nicht nötig; nur für einen späteren eigenen OAuth-Code-Flow |
-| `DISCORD_GUILD_ID` | Optionaler Testserver für sofortige Command-Synchronisierung |
-| `TWMP_API_URL` | Vorhandene Plattform-API, standardmäßig `https://truckerworldmp.com/api/v1` |
-| `TWMP_WEB_URL` | Öffentliche Website für Links in Embeds |
-| `BOT_DATABASE_PATH` | Lokale SQLite-Datei |
-| `COMMAND_SYNC_ON_START` | Slash-Commands beim Start registrieren |
-| `ENABLE_MEMBER_INTENT` | Mitgliederereignisse, Willkommen und Auto-Rolle |
-| `STATUS_POLL_INTERVAL_SECONDS` | Status-/Präsenzintervall, mindestens 30 Sekunden |
-| `ANNOUNCEMENT_POLL_INTERVAL_SECONDS` | News-/Convoy-Prüfung, mindestens 60 Sekunden |
-| `REQUEST_TIMEOUT_SECONDS` | HTTP-Timeout zur Plattform |
+| `DISCORD_CLIENT_ID` | Public Discord application ID |
+| `DISCORD_BOT_TOKEN` | Secret bot token used for the Gateway and Discord API |
+| `DISCORD_CLIENT_SECRET` | Not required for normal bot operation |
+| `DISCORD_GUILD_ID` | Optional test guild for immediate command synchronization |
+| `TWMP_API_URL` | Existing platform API |
+| `TWMP_WEB_URL` | Public website used in links and embeds |
+| `TWMP_LOGO_URL` | Brand icon used in embed footers |
+| `TWMP_PRIMARY_SERVER_SLUG` | Primary server; must remain `europe-1` for this deployment |
+| `BOT_DATABASE_PATH` | Local SQLite database path |
+| `COMMAND_SYNC_ON_START` | Synchronize slash commands at startup |
+| `ENABLE_MEMBER_INTENT` | Enables member events, welcome messages, and automatic roles |
+| `STATUS_POLL_INTERVAL_SECONDS` | Europe 1 presence/status interval, minimum 30 seconds |
+| `ANNOUNCEMENT_POLL_INTERVAL_SECONDS` | News/convoy polling interval, minimum 60 seconds |
+| `REQUEST_TIMEOUT_SECONDS` | Platform HTTP timeout |
 
-Der Bot liest `DISCORD_CLIENT_SECRET` nicht für seinen normalen Betrieb. Discord-Bots authentifizieren sich mit dem
-Bot-Token; die Client-ID identifiziert die Anwendung und erzeugt den Installationslink.
+The bot authenticates with `DISCORD_BOT_TOKEN`. A Discord client secret is only needed if a separate OAuth2
+authorization-code flow is implemented later.
 
-## Tests und Qualität
+## Tests and quality checks
+
+Windows:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
@@ -118,17 +180,25 @@ Bot-Token; die Client-ID identifiziert die Anwendung und erzeugt den Installatio
 .\.venv\Scripts\python.exe -m ruff check .
 ```
 
-## Produktion
+Linux:
 
-Docker Compose:
+```bash
+./.venv/bin/python -m pip install -r requirements-dev.txt
+./.venv/bin/python -m pytest
+./.venv/bin/python -m ruff check .
+```
+
+## Docker
 
 ```bash
 docker compose up -d --build
 docker compose logs -f discord-bot
 ```
 
-Ohne Docker kann `deployment/truckerworldmp-bot.service` nach `/etc/systemd/system/` kopiert und an Benutzer sowie Pfad
-der Zielmaschine angepasst werden. `data/` und `logs/` müssen für den Dienst beschreibbar sein.
+## systemd
 
-Das Token gehört ausschließlich in `.env` oder den Secret Store der Laufzeit. Wird es außerhalb einer geschützten
-Umgebung geteilt, sollte im Discord Developer Portal ein neues Token erzeugt und nur die lokale `.env` aktualisiert werden.
+The included `deployment/truckerworldmp-bot.service` expects the project at `/opt/truckerworldmp-bot` and runs it as
+the `truckerworldmp` system user. If the project remains in `/home/lukas/TruckerWorldMPP`, either update
+`WorkingDirectory`, `ExecStart`, and the service user or move the project to `/opt/truckerworldmp-bot` first.
+
+The `.env` file must remain outside version control and should have mode `600` on Linux.

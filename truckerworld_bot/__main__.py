@@ -11,10 +11,10 @@ def main() -> None:
     try:
         settings = Settings.load()
     except ConfigError as error:
-        raise SystemExit(f"Konfigurationsfehler: {error}") from error
+        raise SystemExit(f"Configuration error: {error}") from error
 
     configure_logging(settings.log_level)
-    logging.getLogger(__name__).info("Starte TruckerWorldMP Discord Bot")
+    logging.getLogger(__name__).info("Starting TruckerWorldMP Discord Bot")
     TruckerWorldBot(settings).run(settings.discord_bot_token, log_handler=None)
 
 

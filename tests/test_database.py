@@ -34,7 +34,7 @@ async def test_rejects_unknown_guild_field(tmp_path) -> None:
     database = Database(tmp_path / "bot.db")
     await database.start()
     try:
-        with pytest.raises(ValueError, match="Unbekanntes"):
+        with pytest.raises(ValueError, match="Unknown"):
             await database.set_guild_value(1, "not_a_column", 2)
     finally:
         await database.close()

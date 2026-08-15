@@ -26,18 +26,19 @@ def test_loads_and_normalizes_configuration(monkeypatch: pytest.MonkeyPatch, tmp
     assert settings.discord_client_id == 123456789012345678
     assert settings.twmp_api_url == "https://example.test/api/v1"
     assert settings.twmp_web_url == "https://example.test"
+    assert settings.twmp_primary_server_slug == "europe-1"
     assert settings.status_poll_interval_seconds == 45
 
 
 def test_rejects_token_from_different_application(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     configure(monkeypatch)
     monkeypatch.setenv("DISCORD_BOT_TOKEN", token_for("999999999999999999"))
-    with pytest.raises(ConfigError, match="gleichen Anwendung"):
+    with pytest.raises(ConfigError, match="same application"):
         Settings.load(tmp_path / "missing.env")
 
 
 def test_rejects_too_short_poll_interval(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     configure(monkeypatch)
     monkeypatch.setenv("STATUS_POLL_INTERVAL_SECONDS", "5")
-    with pytest.raises(ConfigError, match="zwischen 30 und 3600"):
+    with pytest.raises(ConfigError, match="between 30 and 3600"):
         Settings.load(tmp_path / "missing.env")

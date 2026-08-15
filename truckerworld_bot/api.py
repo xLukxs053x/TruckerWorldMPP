@@ -65,7 +65,7 @@ class PlatformClient:
                     if response.status >= 400:
                         error = payload.get("error", {}) if isinstance(payload, dict) else {}
                         raise PlatformAPIError(
-                            str(error.get("message") or f"Plattform antwortet mit HTTP {response.status}."),
+                            str(error.get("message") or f"The platform returned HTTP {response.status}."),
                             code=str(error.get("code") or "PLATFORM_HTTP_ERROR"),
                             status=response.status,
                         )
@@ -73,7 +73,7 @@ class PlatformClient:
                         if not payload.get("ok"):
                             error = payload.get("error", {})
                             raise PlatformAPIError(
-                                str(error.get("message") or "Die Plattformanfrage ist fehlgeschlagen."),
+                                str(error.get("message") or "The platform request failed."),
                                 code=str(error.get("code") or "PLATFORM_ERROR"),
                                 status=response.status,
                             )
@@ -90,7 +90,7 @@ class PlatformClient:
                 last_error = error
                 if attempt == 0:
                     await asyncio.sleep(0.25)
-        raise PlatformAPIError("TruckerWorldMP ist momentan nicht erreichbar.") from last_error
+        raise PlatformAPIError("TruckerWorldMP is currently unavailable.") from last_error
 
     async def health(self) -> JsonObject:
         result = await self._request("health", cache_seconds=15, use_origin=True)
@@ -103,6 +103,25 @@ class PlatformClient:
     async def servers(self) -> list[JsonObject]:
         result = await self._request("servers", cache_seconds=30)
         return result if isinstance(result, list) else []
+
+    async def primary_server(self, slug: str) -> JsonObject:
+        normalized = slug.strip().casefold()
+        server = next(
+            (
+                item
+                for item in await self.servers()
+                if str(item.get("slug", "")).casefold() == normalized
+                or str(item.get("name", "")).casefold() == normalized
+            ),
+            None,
+        )
+        if server is None:
+            raise PlatformAPIError(
+                f"The configured primary server '{slug}' was not found.",
+                code="PRIMARY_SERVER_NOT_FOUND",
+                status=404,
+            )
+        return server
 
     async def news(self) -> list[JsonObject]:
         result = await self._request("news", cache_seconds=60)

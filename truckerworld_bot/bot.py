@@ -56,18 +56,18 @@ class TruckerWorldBot(commands.Bot):
                     guild = discord.Object(id=self.settings.discord_guild_id)
                     self.tree.copy_global_to(guild=guild)
                     synced = await self.tree.sync(guild=guild)
-                    LOGGER.info("%d Slash-Commands für Testserver %d synchronisiert", len(synced), guild.id)
+                    LOGGER.info("Synchronized %d slash commands for test guild %d", len(synced), guild.id)
                 else:
                     synced = await self.tree.sync()
-                    LOGGER.info("%d globale Slash-Commands synchronisiert", len(synced))
+                    LOGGER.info("Synchronized %d global slash commands", len(synced))
             except discord.HTTPException:
-                LOGGER.exception("Slash-Commands konnten nicht synchronisiert werden")
+                LOGGER.exception("Could not synchronize slash commands")
 
     async def on_ready(self) -> None:
         if self.user:
-            LOGGER.info("Verbunden als %s (%d) auf %d Server(n)", self.user, self.user.id, len(self.guilds))
+            LOGGER.info("Connected as %s (%d) in %d guild(s)", self.user, self.user.id, len(self.guilds))
             if self.user.id != self.settings.discord_client_id:
-                LOGGER.error("Der angemeldete Bot gehört nicht zur konfigurierten DISCORD_CLIENT_ID")
+                LOGGER.error("The connected bot does not match the configured DISCORD_CLIENT_ID")
 
     async def close(self) -> None:
         await self.platform.close()
@@ -77,22 +77,22 @@ class TruckerWorldBot(commands.Bot):
     async def on_tree_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
         original = getattr(error, "original", error)
         if isinstance(error, app_commands.CommandOnCooldown):
-            message = f"Bitte warte noch {error.retry_after:.1f} Sekunden."
+            message = f"Please wait another {error.retry_after:.1f} seconds."
         elif isinstance(error, app_commands.MissingPermissions):
-            message = "Dafür fehlen dir die benötigten Discord-Berechtigungen."
+            message = "You do not have the required Discord permissions."
         elif isinstance(error, app_commands.BotMissingPermissions):
-            message = "Mir fehlen dafür Berechtigungen: " + ", ".join(error.missing_permissions)
+            message = "I am missing the following permissions: " + ", ".join(error.missing_permissions)
         elif isinstance(error, app_commands.NoPrivateMessage):
-            message = "Dieser Befehl funktioniert nur auf einem Discord-Server."
+            message = "This command can only be used in a Discord guild."
         elif isinstance(original, PlatformAPIError):
             message = str(original)
         else:
             LOGGER.error(
-                "Fehler in Slash-Command %s",
-                interaction.command.qualified_name if interaction.command else "unbekannt",
+                "Error in slash command %s",
+                interaction.command.qualified_name if interaction.command else "unknown",
                 exc_info=original,
             )
-            message = "Ein interner Bot-Fehler ist aufgetreten. Der Fehler wurde protokolliert."
+            message = "An internal bot error occurred. The error has been logged."
 
         if interaction.response.is_done():
             await interaction.followup.send(embed=error_embed(message), ephemeral=True)

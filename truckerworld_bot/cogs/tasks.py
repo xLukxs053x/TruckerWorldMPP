@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands, tasks
@@ -19,7 +19,7 @@ LOGGER = logging.getLogger(__name__)
 class BackgroundTasksCog(commands.Cog):
     def __init__(self, bot: TruckerWorldBot) -> None:
         self.bot = bot
-        self._last_status_signature: tuple[Any, ...] | None = None
+        self._last_status_signature: tuple[str, str] | None = None
         self._last_news_slug: str | None = None
         self._known_convoys: set[str] | None = None
 
@@ -49,46 +49,44 @@ class BackgroundTasksCog(commands.Cog):
             try:
                 await channel.send(embed=branded(embed.copy(), self.bot.settings.twmp_logo_url), view=view)
             except discord.HTTPException:
-                LOGGER.exception("Automatische Meldung an Kanal %d fehlgeschlagen", channel.id)
+                LOGGER.exception("Could not send automatic announcement to channel %d", channel.id)
 
     @tasks.loop(seconds=60)
     async def status_watch(self) -> None:
         try:
-            status = await self.bot.platform.server_status()
+            server = await self.bot.platform.primary_server(self.bot.settings.twmp_primary_server_slug)
         except PlatformAPIError:
-            LOGGER.warning("Statusprüfung der Plattform fehlgeschlagen")
-            await self.bot.change_presence(
-                status=discord.Status.idle, activity=discord.Game("Plattform nicht erreichbar")
-            )
+            LOGGER.warning("Europe 1 status check failed")
+            await self.bot.change_presence(status=discord.Status.idle, activity=discord.Game("Europe 1 unavailable"))
             return
-        servers = status.get("servers", [])
-        players = int(status.get("players", 0) or 0)
-        capacity = int(status.get("capacity", 0) or 0)
-        operational = bool(status.get("operational"))
-        signature = (
-            operational,
-            tuple(sorted((str(item.get("id")), str(item.get("status"))) for item in servers)),
-        )
+
+        state = str(server.get("status", "offline"))
+        players = int(server.get("players", 0) or 0)
+        capacity = int(server.get("capacity", 0) or 0)
+        operational = state == "online"
+        signature = (str(server.get("id", self.bot.settings.twmp_primary_server_slug)), state)
         await self.bot.change_presence(
             status=discord.Status.online if operational else discord.Status.idle,
-            activity=discord.Game(f"{players}/{capacity} Fahrer · /twmp status"),
+            activity=discord.Game(f"Europe 1 · {players}/{capacity} drivers · /twmp status"),
         )
         previous = self._last_status_signature
         self._last_status_signature = signature
         if previous is None or previous == signature:
             return
+
         embed = base_embed(
-            "Gameserverstatus aktualisiert",
-            f"Aktuell sind **{players}/{capacity}** Fahrer verbunden.",
+            "Europe 1 status updated",
+            f"Europe 1 is now **{STATUS_LABELS.get(state, state.title())}** with **{players}/{capacity}** drivers.",
             color=discord.Color.from_str("#54d88b") if operational else discord.Color.from_str("#ff5576"),
         )
-        for server in servers[:8]:
-            state = str(server.get("status", "offline"))
-            embed.add_field(
-                name=clipped(server.get("name"), 256),
-                value=f"{STATUS_ICONS.get(state, '⚪')} {STATUS_LABELS.get(state, state.title())} · {server.get('players', 0)}/{server.get('capacity', 0)}",
-                inline=False,
-            )
+        embed.add_field(
+            name=clipped(server.get("name"), 256),
+            value=(
+                f"{STATUS_ICONS.get(state, '⚪')} {STATUS_LABELS.get(state, state.title())} · "
+                f"{players}/{capacity} players · Queue: {server.get('queue', 0)}"
+            ),
+            inline=False,
+        )
         await self._broadcast(embed)
 
     @status_watch.before_loop
@@ -98,9 +96,11 @@ class BackgroundTasksCog(commands.Cog):
     @tasks.loop(seconds=300)
     async def announcement_watch(self) -> None:
         try:
-            articles, convoys = await self.bot.platform.news(), await self.bot.platform.convoys()
+            articles = await self.bot.platform.news()
+            convoys = await self.bot.platform.convoys()
+            primary = await self.bot.platform.primary_server(self.bot.settings.twmp_primary_server_slug)
         except PlatformAPIError:
-            LOGGER.warning("News-/Convoy-Prüfung der Plattform fehlgeschlagen")
+            LOGGER.warning("News and Europe 1 convoy check failed")
             return
 
         sorted_articles = sorted(articles, key=lambda item: item.get("publishedAt") or "", reverse=True)
@@ -109,17 +109,21 @@ class BackgroundTasksCog(commands.Cog):
         if self._last_news_slug is not None and latest_slug and latest_slug != self._last_news_slug:
             url = f"{self.bot.settings.twmp_web_url}/news/{latest_slug}"
             embed = base_embed(
-                str(latest.get("title", "Neue TruckerWorldMP-News")), clipped(latest.get("excerpt"), 3500)
+                str(latest.get("title", "New TruckerWorldMP update")), clipped(latest.get("excerpt"), 3500)
             )
-            embed.add_field(name="Kategorie", value=clipped(latest.get("category"), 100))
-            embed.add_field(name="Veröffentlicht", value=discord_time(latest.get("publishedAt"), "R"))
+            embed.add_field(name="Category", value=clipped(latest.get("category"), 100))
+            embed.add_field(name="Published", value=discord_time(latest.get("publishedAt"), "R"))
             view = discord.ui.View()
-            view.add_item(discord.ui.Button(label="Artikel öffnen", url=url, emoji="📰"))
+            view.add_item(discord.ui.Button(label="Open Article", url=url, emoji="📰"))
             await self._broadcast(embed, view=view)
         self._last_news_slug = latest_slug
 
         now = datetime.now(timezone.utc)
-        upcoming = [item for item in convoys if (parse_datetime(item.get("departureAt")) or now) >= now]
+        upcoming = [
+            item
+            for item in convoys
+            if item.get("serverId") == primary.get("id") and (parse_datetime(item.get("departureAt")) or now) >= now
+        ]
         current_ids = {str(item.get("id") or item.get("slug")) for item in upcoming}
         if self._known_convoys is not None:
             new_ids = current_ids - self._known_convoys
@@ -128,18 +132,19 @@ class BackgroundTasksCog(commands.Cog):
                 key=lambda item: item.get("departureAt", ""),
             )[:3]:
                 embed = base_embed(
-                    f"Neuer Convoy: {convoy.get('title', 'Community-Fahrt')}",
+                    f"New Europe 1 Convoy: {convoy.get('title', 'Community Drive')}",
                     clipped(convoy.get("description"), 3500),
                 )
                 embed.add_field(
-                    name="Route", value=f"{convoy.get('departureCity', '—')} → {convoy.get('destinationCity', '—')}"
+                    name="Route",
+                    value=f"{convoy.get('departureCity', '—')} → {convoy.get('destinationCity', '—')}",
                 )
-                embed.add_field(name="Abfahrt", value=discord_time(convoy.get("departureAt")))
-                embed.add_field(name="Spiel", value=str(convoy.get("game", "ets2")).upper())
+                embed.add_field(name="Departure", value=discord_time(convoy.get("departureAt")))
+                embed.add_field(name="Game", value=str(convoy.get("game", "ets2")).upper())
                 view = discord.ui.View()
                 view.add_item(
                     discord.ui.Button(
-                        label="Convoy ansehen",
+                        label="View Convoy",
                         url=f"{self.bot.settings.twmp_web_url}/convoys/{convoy.get('slug', '')}",
                         emoji="🚛",
                     )
