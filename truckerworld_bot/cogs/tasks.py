@@ -164,8 +164,13 @@ class BackgroundTasksCog(commands.Cog):
     async def ticket_reopen_watch(self) -> None:
         try:
             queued = await self.bot.platform.discord_reopen_queue()
-        except PlatformAPIError:
-            LOGGER.warning("Discord ticket reopen queue check failed")
+        except PlatformAPIError as error:
+            LOGGER.warning(
+                "Discord ticket reopen queue check failed: %s (code=%s, status=%s)",
+                error,
+                error.code,
+                error.status,
+            )
             return
         for platform_ticket in queued:
             discord_context = platform_ticket.get("discord")
@@ -227,8 +232,13 @@ class BackgroundTasksCog(commands.Cog):
     async def ticket_message_outbox(self) -> None:
         try:
             items = await self.bot.platform.discord_message_outbox()
-        except PlatformAPIError:
-            LOGGER.warning("Discord support message outbox check failed")
+        except PlatformAPIError as error:
+            LOGGER.warning(
+                "Discord support message outbox check failed: %s (code=%s, status=%s)",
+                error,
+                error.code,
+                error.status,
+            )
             return
         for item in items:
             ticket = item.get("ticket")
