@@ -16,7 +16,9 @@ selection.
 - automatic Europe 1 presence and server status announcements
 - automatic news and Europe 1 convoy announcements
 - welcome messages, farewell messages, automatic member role, and Discord logs
-- persistent private ticket system with a support role and ticket category
+- account-gated private tickets linked to the user's TWMP Discord connection
+- two-way Discord/My Support synchronization and protected PDF transcripts
+- website reopen requests for closed tickets within a 20-day window
 - Discord warnings, timeouts, timeout removal, and message cleanup
 - complete per-guild setup through `/admin`
 - SQLite with WAL mode for guild settings, tickets, and Discord warnings
@@ -25,10 +27,10 @@ selection.
 
 - Python 3.10 or newer
 - a Discord application with a bot user
-- `Server Members Intent` enabled in the Discord Developer Portal
+- `Server Members Intent` and `Message Content Intent` enabled in the Discord Developer Portal
 - access to `https://truckerworldmp.com/api/v1`
 
-`Message Content Intent` is not required.
+`Message Content Intent` is required so ticket messages can be synchronized and included in the PDF transcript.
 
 ## Windows installation
 
@@ -72,7 +74,7 @@ Windows cannot be reused on Linux; always create `.venv` again on the target mac
 
 ## Discord Developer Portal
 
-Enable `Server Members Intent` under **Bot → Privileged Gateway Intents**. Under
+Enable `Server Members Intent` and `Message Content Intent` under **Bot → Privileged Gateway Intents**. Under
 **Installation → Guild Install**, use the `bot` and `applications.commands` scopes.
 
 The bot needs these permissions:
@@ -101,8 +103,10 @@ After installing the bot, a guild administrator should run:
 ```
 
 The bot role must be above the automatic member role and above any member roles the bot needs to moderate.
-Closing a ticket does not delete its channel. The closed channel remains available to support staff until it is
-manually archived or deleted.
+Only Discord users with a linked TWMP account can open a ticket. Closing does not delete the channel: it locks the
+requester, uploads a private PDF transcript to My Support, and keeps the channel available to support staff. For 20
+days the requester can apply to reopen the same case on the website; after approval, the bot unlocks or recreates
+the mapped channel automatically.
 
 ## Commands
 
@@ -160,9 +164,12 @@ The complete secret-free template is available in `.env.example`.
 | `TWMP_WEB_URL` | Public website used in links and embeds |
 | `TWMP_LOGO_URL` | Brand icon used in embed footers |
 | `TWMP_PRIMARY_SERVER_SLUG` | Primary server; must remain `europe-1` for this deployment |
+| `TWMP_BOT_SERVICE_SECRET` | Shared 32+ character secret; must match the API's `DISCORD_BOT_SERVICE_SECRET` |
+| `TWMP_ACCOUNT_HELP_IMAGE_URL` | Public English account-linking guide embedded in the account-required DM |
 | `BOT_DATABASE_PATH` | Local SQLite database path |
 | `COMMAND_SYNC_ON_START` | Synchronize slash commands at startup |
 | `ENABLE_MEMBER_INTENT` | Enables member events, welcome messages, and automatic roles |
+| `ENABLE_MESSAGE_CONTENT_INTENT` | Enables ticket synchronization and PDF transcript content |
 | `STATUS_POLL_INTERVAL_SECONDS` | Europe 1 presence/status interval, minimum 30 seconds |
 | `ANNOUNCEMENT_POLL_INTERVAL_SECONDS` | News/convoy polling interval, minimum 60 seconds |
 | `REQUEST_TIMEOUT_SECONDS` | Platform HTTP timeout |

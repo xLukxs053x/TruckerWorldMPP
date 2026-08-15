@@ -250,6 +250,19 @@ class PlatformClient:
         result = await self._request("internal/discord/reopen-queue", service_auth=True)
         return result if isinstance(result, list) else []
 
+    async def discord_message_outbox(self) -> list[JsonObject]:
+        result = await self._request("internal/discord/message-outbox", service_auth=True)
+        return result if isinstance(result, list) else []
+
+    async def mark_discord_message_delivered(self, message_id: str, external_message_id: int) -> JsonObject:
+        result = await self._request(
+            f"internal/discord/messages/{quote(message_id, safe='')}/delivered",
+            method="POST",
+            service_auth=True,
+            json_body={"externalMessageId": str(external_message_id)},
+        )
+        return result if isinstance(result, dict) else {}
+
     async def mark_discord_ticket_reopened(
         self, ticket_id: str, discord_user_id: int, guild_id: int, channel_id: int
     ) -> JsonObject:

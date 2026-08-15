@@ -233,7 +233,7 @@ class TicketPanelView(discord.ui.View):
         self.bot = bot
 
     @discord.ui.button(label="Open Support Ticket", emoji="\U0001f39f\ufe0f", style=discord.ButtonStyle.primary, custom_id="twmp:ticket:create")
-    async def create_button(self, interaction: discord.Interaction, _button: discord.ui.Button["TicketPanelView"]) -> None:
+    async def create_button(self, interaction: discord.Interaction, _button: discord.ui.Button[TicketPanelView]) -> None:
         await create_ticket(interaction, self.bot)
 
 
@@ -243,5 +243,5 @@ class TicketCloseView(discord.ui.View):
         self.bot = bot
 
     @discord.ui.button(label="Close & Archive Ticket", emoji="\U0001f512", style=discord.ButtonStyle.danger, custom_id="twmp:ticket:close")
-    async def close_button(self, interaction: discord.Interaction, _button: discord.ui.Button["TicketCloseView"]) -> None:
+    async def close_button(self, interaction: discord.Interaction, _button: discord.ui.Button[TicketCloseView]) -> None:
         await close_ticket(interaction, self.bot)

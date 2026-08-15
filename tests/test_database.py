@@ -16,10 +16,13 @@ async def test_guild_settings_tickets_and_warnings(tmp_path) -> None:
         updated = await database.set_guild_value(10, "welcome_channel_id", 20)
         assert updated.welcome_channel_id == 20
 
-        ticket = await database.create_ticket(10, 30, 40)
+        ticket = await database.create_ticket(10, 30, 40, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "SUP-000001")
         assert (await database.find_open_ticket(10, 40)).id == ticket.id  # type: ignore[union-attr]
+        assert (await database.ticket_by_platform_id("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")).platform_reference == "SUP-000001"  # type: ignore[union-attr]
         assert await database.close_ticket(30)
         assert not await database.close_ticket(30)
+        reopened = await database.reopen_ticket("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", 10, 30, 40)
+        assert reopened.status == "open"
 
         warning_id = await database.add_warning(10, 40, 50, "Testgrund")
         warnings = await database.list_warnings(10, 40)

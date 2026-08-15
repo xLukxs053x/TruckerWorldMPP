@@ -28,10 +28,14 @@ class BackgroundTasksCog(commands.Cog):
         self.announcement_watch.change_interval(seconds=self.bot.settings.announcement_poll_interval_seconds)
         self.status_watch.start()
         self.announcement_watch.start()
+        self.ticket_reopen_watch.start()
+        self.ticket_message_outbox.start()
 
     async def cog_unload(self) -> None:
         self.status_watch.cancel()
         self.announcement_watch.cancel()
+        self.ticket_reopen_watch.cancel()
+        self.ticket_message_outbox.cancel()
 
     async def _announcement_channels(self) -> list[discord.TextChannel]:
         channels: list[discord.TextChannel] = []
@@ -154,4 +158,113 @@ class BackgroundTasksCog(commands.Cog):
 
     @announcement_watch.before_loop
     async def before_announcement_watch(self) -> None:
+        await self.bot.wait_until_ready()
+
+    @tasks.loop(seconds=60)
+    async def ticket_reopen_watch(self) -> None:
+        try:
+            queued = await self.bot.platform.discord_reopen_queue()
+        except PlatformAPIError:
+            LOGGER.warning("Discord ticket reopen queue check failed")
+            return
+        for platform_ticket in queued:
+            discord_context = platform_ticket.get("discord")
+            if not isinstance(discord_context, dict):
+                continue
+            try:
+                ticket_id = str(platform_ticket["id"])
+                reference = str(platform_ticket["reference"])
+                guild_id = int(discord_context["guildId"])
+                channel_id = int(discord_context["channelId"])
+                owner_id = int(discord_context["userId"])
+            except (KeyError, TypeError, ValueError):
+                LOGGER.error("Invalid Discord context in reopen request: %r", platform_ticket)
+                continue
+            guild = self.bot.get_guild(guild_id)
+            if guild is None:
+                continue
+            owner = guild.get_member(owner_id)
+            if owner is None:
+                try:
+                    owner = await guild.fetch_member(owner_id)
+                except discord.HTTPException:
+                    continue
+            settings = await self.bot.database.get_guild_settings(guild.id)
+            support_role = guild.get_role(settings.support_role_id) if settings.support_role_id else None
+            category = guild.get_channel(settings.ticket_category_id) if settings.ticket_category_id else None
+            if support_role is None or not isinstance(category, discord.CategoryChannel) or guild.me is None:
+                continue
+            channel = guild.get_channel(channel_id)
+            try:
+                if isinstance(channel, discord.TextChannel):
+                    await channel.set_permissions(owner, view_channel=True, send_messages=True, read_message_history=True, attach_files=True, embed_links=True)
+                    await channel.edit(name=f"{reference.lower()}-{owner.display_name.lower()}"[:100], topic=f"{reference} - reopened after website approval")
+                else:
+                    overwrites = {
+                        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                        owner: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True, attach_files=True, embed_links=True),
+                        support_role: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True, attach_files=True, embed_links=True),
+                        guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True, manage_channels=True, manage_messages=True),
+                    }
+                    channel = await guild.create_text_channel(f"{reference.lower()}-{owner.display_name.lower()}"[:100], category=category, overwrites=overwrites, topic=f"{reference} - reopened after website approval", reason=f"Approved reopen request for {reference}")
+                local = await self.bot.database.ticket_by_platform_id(ticket_id)
+                if local:
+                    await self.bot.database.reopen_ticket(ticket_id, guild.id, channel.id, owner.id)
+                else:
+                    await self.bot.database.create_ticket(guild.id, channel.id, owner.id, platform_ticket_id=ticket_id, platform_reference=reference)
+                await self.bot.platform.mark_discord_ticket_reopened(ticket_id, owner.id, guild.id, channel.id)
+                embed = base_embed("Ticket reopened", f"The reopen request for **{reference}** was approved. Continue the existing conversation here; there is no need to create a new ticket.")
+                embed.add_field(name="Original topic", value=str(platform_ticket.get("subject", "Support request"))[:1024], inline=False)
+                await channel.send(content=f"{owner.mention} {support_role.mention}", embed=embed, allowed_mentions=discord.AllowedMentions(users=True, roles=True, everyone=False))
+            except (discord.HTTPException, PlatformAPIError):
+                LOGGER.exception("Could not reopen Discord ticket %s", reference)
+
+    @ticket_reopen_watch.before_loop
+    async def before_ticket_reopen_watch(self) -> None:
+        await self.bot.wait_until_ready()
+
+    @tasks.loop(seconds=5)
+    async def ticket_message_outbox(self) -> None:
+        try:
+            items = await self.bot.platform.discord_message_outbox()
+        except PlatformAPIError:
+            LOGGER.warning("Discord support message outbox check failed")
+            return
+        for item in items:
+            ticket = item.get("ticket")
+            message = item.get("message")
+            if not isinstance(ticket, dict) or not isinstance(message, dict) or not isinstance(ticket.get("discord"), dict):
+                continue
+            discord_context = ticket["discord"]
+            try:
+                channel_id = int(discord_context["channelId"])
+                message_id = str(message["id"])
+                author = message["author"]
+                if not isinstance(author, dict):
+                    continue
+            except (KeyError, TypeError, ValueError):
+                continue
+            channel = self.bot.get_channel(channel_id)
+            if not isinstance(channel, discord.TextChannel):
+                continue
+            requester = ticket.get("requester")
+            from_requester = isinstance(requester, dict) and requester.get("id") == author.get("id")
+            embed = base_embed(
+                "Reply from My Support",
+                str(message.get("body", ""))[:4000],
+                color=discord.Color.from_str("#5865f2") if from_requester else discord.Color.from_str("#ff5a1f"),
+            )
+            embed.add_field(name="Author", value=f"{author.get('displayName', 'TWMP user')} - {author.get('publicId', 'linked account')}", inline=False)
+            attachments = message.get("attachmentUrls")
+            if isinstance(attachments, list) and attachments:
+                embed.add_field(name="Attachments", value="\n".join(str(url) for url in attachments)[:1024], inline=False)
+            embed.set_footer(text=f"Synced from My Support - {ticket.get('reference', 'Support ticket')}")
+            try:
+                sent = await channel.send(embed=embed)
+                await self.bot.platform.mark_discord_message_delivered(message_id, sent.id)
+            except (discord.HTTPException, PlatformAPIError):
+                LOGGER.exception("Could not deliver website support message %s to Discord", message_id)
+
+    @ticket_message_outbox.before_loop
+    async def before_ticket_message_outbox(self) -> None:
         await self.bot.wait_until_ready()

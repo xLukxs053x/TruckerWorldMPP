@@ -148,12 +148,17 @@ class AdminCog(commands.GroupCog, group_name="admin", group_description="Bot set
             return
         embed = base_embed(
             "TruckerWorldMP Support",
-            "Having trouble with your account, the launcher, a download, or multiplayer? "
-            "Press the button and describe your request in a private ticket.",
+            "Private support for TWMP accounts, the launcher, Europe 1, and technical issues. "
+            "Only Discord users with a linked TruckerWorldMP account can continue.",
+        )
+        embed.add_field(
+            name="Synchronized support history",
+            value="One active case per account. Closing stores a private PDF in My Support; recent tickets can be submitted for reopening for 20 days.",
+            inline=False,
         )
         embed.add_field(
             name="Before you continue",
-            value="One ticket per person. Never send passwords, tokens, or other private credentials.",
+            value="Never send passwords, login cookies, tokens, recovery codes, or other credentials.",
             inline=False,
         )
         await target.send(embed=branded(embed, self.bot.settings.twmp_logo_url), view=TicketPanelView(self.bot))

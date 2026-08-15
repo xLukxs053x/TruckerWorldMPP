@@ -1,17 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from html import escape
 from io import BytesIO
-from typing import Iterable
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate, Paragraph, Spacer, Table, TableStyle
 
 ORANGE = colors.HexColor("#ff5a1f")
 INK = colors.HexColor("#161616")
@@ -92,7 +92,7 @@ def build_ticket_transcript(
         canvas.drawRightString(width - 15 * mm, 9 * mm, f"Page {document.page}")
         canvas.restoreState()
 
-    document = SimpleDocTemplate(
+    document = BaseDocTemplate(
         output,
         pagesize=A4,
         rightMargin=15 * mm,
@@ -103,6 +103,8 @@ def build_ticket_transcript(
         author="TruckerWorldMP Support",
         subject="Discord support transcript",
     )
+    frame = Frame(document.leftMargin, document.bottomMargin, document.width, document.height, id="transcript")
+    document.addPageTemplates([PageTemplate(id="transcript-pages", frames=[frame], onPageEnd=page)])
     story: list[object] = [
         Paragraph("DISCORD SUPPORT RECORD", eyebrow),
         Paragraph(_pdf_text(subject), title),
@@ -157,5 +159,5 @@ def build_ticket_transcript(
             ),
         )
         story.extend([card, Spacer(1, 3 * mm)])
-    document.build(story, onFirstPage=page, onLaterPages=page)
+    document.build(story)
     return output.getvalue(), len(transcript_messages)

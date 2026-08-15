@@ -17,6 +17,7 @@ def configure(monkeypatch: pytest.MonkeyPatch, client_id: str = "123456789012345
     monkeypatch.setenv("DISCORD_BOT_TOKEN", token_for(client_id))
     monkeypatch.setenv("TWMP_API_URL", "https://example.test/api/v1/")
     monkeypatch.setenv("TWMP_WEB_URL", "https://example.test/")
+    monkeypatch.setenv("TWMP_BOT_SERVICE_SECRET", "test-bot-service-secret-with-32-characters")
     monkeypatch.setenv("STATUS_POLL_INTERVAL_SECONDS", "45")
 
 

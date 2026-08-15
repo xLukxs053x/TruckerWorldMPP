@@ -38,17 +38,22 @@ class CommunityCog(commands.GroupCog, group_name="ticket", group_description="Di
     async def ticket_panel(self, interaction: discord.Interaction) -> None:
         embed = base_embed(
             "TruckerWorldMP Support",
-            "Need help with your account, the launcher, a download, or multiplayer? "
-            "Create a private ticket here. Please open only one ticket at a time.",
+            "Account, launcher, Europe 1, technical, and safety support in one private place. "
+            "Your Discord account must be linked to a TruckerWorldMP account.",
         )
         embed.add_field(
-            name="Before creating a ticket",
-            value="Describe the problem precisely and have any error messages or screenshots ready.",
+            name="One continuous support case",
+            value="Use your existing ticket whenever possible. Tickets closed within the last 20 days can be submitted for reopening from My Support.",
             inline=False,
         )
         embed.add_field(
-            name="Security",
-            value="Never send passwords, login cookies, bot tokens, or other credentials.",
+            name="Private transcript",
+            value="The conversation is synchronized with your TWMP account. Closing the ticket creates a private PDF transcript in My Support.",
+            inline=False,
+        )
+        embed.add_field(
+            name="Stay secure",
+            value="Never send passwords, login cookies, bot tokens, backup codes, or other credentials.",
             inline=False,
         )
         await interaction.channel.send(  # type: ignore[union-attr]
