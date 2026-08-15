@@ -19,6 +19,7 @@ class TruckerWorldBot(commands.Bot):
         intents = discord.Intents.none()
         intents.guilds = True
         intents.members = settings.enable_member_intent
+        intents.message_content = settings.enable_message_content_intent
         intents.moderation = True
         super().__init__(
             command_prefix=commands.when_mentioned,
@@ -29,7 +30,11 @@ class TruckerWorldBot(commands.Bot):
         )
         self.settings = settings
         self.database = Database(settings.database_path)
-        self.platform = PlatformClient(settings.twmp_api_url, settings.request_timeout_seconds)
+        self.platform = PlatformClient(
+            settings.twmp_api_url,
+            settings.request_timeout_seconds,
+            service_secret=settings.twmp_bot_service_secret,
+        )
         self.tree.on_error = self.on_tree_error
 
     async def setup_hook(self) -> None:
@@ -68,6 +73,41 @@ class TruckerWorldBot(commands.Bot):
             LOGGER.info("Connected as %s (%d) in %d guild(s)", self.user, self.user.id, len(self.guilds))
             if self.user.id != self.settings.discord_client_id:
                 LOGGER.error("The connected bot does not match the configured DISCORD_CLIENT_ID")
+
+    async def on_message(self, message: discord.Message) -> None:
+        if message.author.bot or not isinstance(message.channel, discord.TextChannel):
+            return
+        ticket = await self.database.ticket_by_channel(message.channel.id)
+        if not ticket or ticket.status != "open" or not ticket.platform_ticket_id:
+            return
+        body = message.content.strip()
+        if not body and message.attachments:
+            body = "[Attachment-only Discord message]"
+        if not body:
+            return
+        try:
+            await self.platform.sync_discord_message(
+                ticket.platform_ticket_id,
+                discord_user_id=message.author.id,
+                body=body,
+                external_message_id=message.id,
+                attachment_urls=[attachment.url for attachment in message.attachments],
+            )
+        except PlatformAPIError as error:
+            LOGGER.warning(
+                "Could not synchronize Discord message %d for ticket %s: %s",
+                message.id,
+                ticket.platform_reference or ticket.platform_ticket_id,
+                error,
+            )
+            try:
+                await message.add_reaction("\u26a0\ufe0f")
+                await message.author.send(
+                    "Your message remains visible in Discord, but it could not be synchronized to My Support. "
+                    "Make sure this Discord account is linked to TWMP, then contact a platform administrator if the warning remains."
+                )
+            except discord.HTTPException:
+                pass
 
     async def close(self) -> None:
         await self.platform.close()

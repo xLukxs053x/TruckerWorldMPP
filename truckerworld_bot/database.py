@@ -30,6 +30,8 @@ class TicketRecord:
     status: str
     created_at: str
     closed_at: str | None
+    platform_ticket_id: str | None = None
+    platform_reference: str | None = None
 
 
 class Database:
@@ -88,6 +90,14 @@ class Database:
             CREATE INDEX IF NOT EXISTS idx_warnings_user ON warnings(guild_id, user_id, created_at DESC);
             """
         )
+        columns = {row[1] for row in await (await self.connection.execute("PRAGMA table_info(tickets)")).fetchall()}
+        if "platform_ticket_id" not in columns:
+            await self.connection.execute("ALTER TABLE tickets ADD COLUMN platform_ticket_id TEXT")
+        if "platform_reference" not in columns:
+            await self.connection.execute("ALTER TABLE tickets ADD COLUMN platform_reference TEXT")
+        await self.connection.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_platform ON tickets(platform_ticket_id) WHERE platform_ticket_id IS NOT NULL"
+        )
         await self.connection.commit()
 
     async def close(self) -> None:
@@ -132,22 +142,59 @@ class Database:
         row = await cursor.fetchone()
         return TicketRecord(**dict(row)) if row else None
 
-    async def create_ticket(self, guild_id: int, channel_id: int, owner_id: int) -> TicketRecord:
+    async def create_ticket(
+        self,
+        guild_id: int,
+        channel_id: int,
+        owner_id: int,
+        platform_ticket_id: str | None = None,
+        platform_reference: str | None = None,
+    ) -> TicketRecord:
         connection = self._connection()
         timestamp = datetime.now(timezone.utc).isoformat()
         async with self._write_lock:
             cursor = await connection.execute(
-                "INSERT INTO tickets (guild_id, channel_id, owner_id, status, created_at) VALUES (?, ?, ?, 'open', ?)",
-                (guild_id, channel_id, owner_id, timestamp),
+                "INSERT INTO tickets (guild_id, channel_id, owner_id, status, created_at, platform_ticket_id, platform_reference) VALUES (?, ?, ?, 'open', ?, ?, ?)",
+                (guild_id, channel_id, owner_id, timestamp, platform_ticket_id, platform_reference),
             )
             await connection.commit()
             ticket_id = cursor.lastrowid
-        return TicketRecord(ticket_id, guild_id, channel_id, owner_id, "open", timestamp, None)
+        return TicketRecord(
+            id=int(ticket_id or 0),
+            guild_id=guild_id,
+            channel_id=channel_id,
+            owner_id=owner_id,
+            status="open",
+            created_at=timestamp,
+            closed_at=None,
+            platform_ticket_id=platform_ticket_id,
+            platform_reference=platform_reference,
+        )
 
     async def ticket_by_channel(self, channel_id: int) -> TicketRecord | None:
         cursor = await self._connection().execute("SELECT * FROM tickets WHERE channel_id = ?", (channel_id,))
         row = await cursor.fetchone()
         return TicketRecord(**dict(row)) if row else None
+
+    async def ticket_by_platform_id(self, platform_ticket_id: str) -> TicketRecord | None:
+        cursor = await self._connection().execute(
+            "SELECT * FROM tickets WHERE platform_ticket_id = ?", (platform_ticket_id,)
+        )
+        row = await cursor.fetchone()
+        return TicketRecord(**dict(row)) if row else None
+
+    async def reopen_ticket(self, platform_ticket_id: str, guild_id: int, channel_id: int, owner_id: int) -> TicketRecord:
+        connection = self._connection()
+        async with self._write_lock:
+            await connection.execute(
+                "UPDATE tickets SET guild_id = ?, channel_id = ?, owner_id = ?, status = 'open', closed_at = NULL WHERE platform_ticket_id = ?",
+                (guild_id, channel_id, owner_id, platform_ticket_id),
+            )
+            await connection.commit()
+        ticket = await self.ticket_by_platform_id(platform_ticket_id)
+        if ticket is None:
+            raise RuntimeError("The platform ticket mapping could not be reopened.")
+        return ticket
 
     async def close_ticket(self, channel_id: int) -> bool:
         connection = self._connection()

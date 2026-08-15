@@ -64,10 +64,13 @@ class Settings:
     twmp_web_url: str
     twmp_logo_url: str
     twmp_primary_server_slug: str
+    twmp_bot_service_secret: str
+    twmp_account_help_image_url: str
     database_path: Path
     log_level: str
     command_sync_on_start: bool
     enable_member_intent: bool
+    enable_message_content_intent: bool
     status_poll_interval_seconds: int
     announcement_poll_interval_seconds: int
     request_timeout_seconds: int
@@ -97,6 +100,9 @@ class Settings:
         primary_server_slug = os.getenv("TWMP_PRIMARY_SERVER_SLUG", "europe-1").strip().lower()
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,99}", primary_server_slug):
             raise ConfigError("TWMP_PRIMARY_SERVER_SLUG must be a valid server slug.")
+        bot_service_secret = os.getenv("TWMP_BOT_SERVICE_SECRET", "").strip()
+        if len(bot_service_secret) < 32:
+            raise ConfigError("TWMP_BOT_SERVICE_SECRET must contain at least 32 characters.")
 
         database_path = Path(os.getenv("BOT_DATABASE_PATH", "data/truckerworldmp-bot.db").strip())
         return cls(
@@ -108,10 +114,15 @@ class Settings:
             twmp_web_url=web_url,
             twmp_logo_url=os.getenv("TWMP_LOGO_URL", f"{web_url}/twmp-icon.png").strip(),
             twmp_primary_server_slug=primary_server_slug,
+            twmp_bot_service_secret=bot_service_secret,
+            twmp_account_help_image_url=os.getenv(
+                "TWMP_ACCOUNT_HELP_IMAGE_URL", f"{web_url}/media/discord-ticket-account.png"
+            ).strip(),
             database_path=database_path,
             log_level=os.getenv("LOG_LEVEL", "INFO").strip().upper(),
             command_sync_on_start=_bool(os.getenv("COMMAND_SYNC_ON_START"), True),
             enable_member_intent=_bool(os.getenv("ENABLE_MEMBER_INTENT"), True),
+            enable_message_content_intent=_bool(os.getenv("ENABLE_MESSAGE_CONTENT_INTENT"), True),
             status_poll_interval_seconds=_integer("STATUS_POLL_INTERVAL_SECONDS", 60, 30, 3600),
             announcement_poll_interval_seconds=_integer("ANNOUNCEMENT_POLL_INTERVAL_SECONDS", 300, 60, 86_400),
             request_timeout_seconds=_integer("REQUEST_TIMEOUT_SECONDS", 10, 2, 60),

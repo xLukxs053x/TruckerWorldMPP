@@ -19,12 +19,13 @@ class PlatformAPIError(RuntimeError):
 
 
 class PlatformClient:
-    def __init__(self, base_url: str, timeout_seconds: int = 10) -> None:
+    def __init__(self, base_url: str, timeout_seconds: int = 10, *, service_secret: str | None = None) -> None:
         self.base_url = base_url.rstrip("/")
         parsed = urlsplit(self.base_url)
         self.origin = urlunsplit((parsed.scheme, parsed.netloc, "", "", "")).rstrip("/")
         self.timeout = aiohttp.ClientTimeout(total=timeout_seconds, connect=min(timeout_seconds, 5))
         self.session: aiohttp.ClientSession | None = None
+        self.service_secret = service_secret
         self._cache: dict[str, tuple[float, Any]] = {}
         self._cache_lock = asyncio.Lock()
 
@@ -46,21 +47,39 @@ class PlatformClient:
         params: Mapping[str, str] | None = None,
         cache_seconds: int = 0,
         use_origin: bool = False,
+        method: str = "GET",
+        json_body: JsonObject | None = None,
+        data: bytes | None = None,
+        headers: Mapping[str, str] | None = None,
+        service_auth: bool = False,
     ) -> Any:
         await self.start()
         base = self.origin if use_origin else self.base_url
         url = f"{base}/{path.lstrip('/')}"
         cache_key = f"{url}?{sorted((params or {}).items())}"
         now = time.monotonic()
-        cached = self._cache.get(cache_key)
+        cached = self._cache.get(cache_key) if method == "GET" else None
         if cached and cached[0] > now:
             return cached[1]
 
         assert self.session is not None
         last_error: Exception | None = None
-        for attempt in range(2):
+        request_headers = dict(headers or {})
+        if service_auth:
+            if not self.service_secret:
+                raise PlatformAPIError("The bot service secret is not configured.", code="BOT_SECRET_MISSING")
+            request_headers["X-Discord-Bot-Secret"] = self.service_secret
+        attempts = 2 if method == "GET" else 1
+        for attempt in range(attempts):
             try:
-                async with self.session.get(url, params=params) as response:
+                async with self.session.request(
+                    method,
+                    url,
+                    params=params,
+                    json=json_body,
+                    data=data,
+                    headers=request_headers,
+                ) as response:
                     payload = await response.json(content_type=None)
                     if response.status >= 400:
                         error = payload.get("error", {}) if isinstance(payload, dict) else {}
@@ -88,7 +107,7 @@ class PlatformClient:
                 raise
             except (TimeoutError, aiohttp.ClientError, ValueError) as error:
                 last_error = error
-                if attempt == 0:
+                if attempt + 1 < attempts:
                     await asyncio.sleep(0.25)
         raise PlatformAPIError("TruckerWorldMP is currently unavailable.") from last_error
 
@@ -145,4 +164,103 @@ class PlatformClient:
 
     async def launcher_latest(self, channel: str = "stable") -> JsonObject:
         result = await self._request("launcher/latest", params={"channel": channel}, cache_seconds=60)
+        return result if isinstance(result, dict) else {}
+
+    async def linked_discord_user(self, discord_user_id: int) -> JsonObject:
+        result = await self._request(
+            f"internal/discord/users/{discord_user_id}",
+            service_auth=True,
+        )
+        return result if isinstance(result, dict) else {}
+
+    async def ticket_eligibility(self, discord_user_id: int) -> JsonObject:
+        result = await self._request(
+            f"internal/discord/users/{discord_user_id}/ticket-eligibility",
+            service_auth=True,
+        )
+        return result if isinstance(result, dict) else {}
+
+    async def create_discord_ticket(
+        self,
+        *,
+        discord_user_id: int,
+        discord_guild_id: int,
+        discord_channel_id: int,
+        subject: str,
+        category: str,
+        message: str,
+    ) -> JsonObject:
+        result = await self._request(
+            "internal/discord/tickets",
+            method="POST",
+            service_auth=True,
+            json_body={
+                "discordUserId": str(discord_user_id),
+                "discordGuildId": str(discord_guild_id),
+                "discordChannelId": str(discord_channel_id),
+                "subject": subject,
+                "category": category,
+                "message": message,
+            },
+        )
+        return result if isinstance(result, dict) else {}
+
+    async def sync_discord_message(
+        self,
+        ticket_id: str,
+        *,
+        discord_user_id: int,
+        body: str,
+        external_message_id: int,
+        attachment_urls: list[str],
+    ) -> JsonObject:
+        result = await self._request(
+            f"internal/discord/tickets/{quote(ticket_id, safe='')}/messages",
+            method="POST",
+            service_auth=True,
+            json_body={
+                "discordUserId": str(discord_user_id),
+                "body": body,
+                "externalMessageId": str(external_message_id),
+                "attachmentUrls": attachment_urls,
+            },
+        )
+        return result if isinstance(result, dict) else {}
+
+    async def upload_ticket_transcript(self, ticket_id: str, pdf: bytes, message_count: int) -> JsonObject:
+        result = await self._request(
+            f"internal/discord/tickets/{quote(ticket_id, safe='')}/transcript",
+            method="PUT",
+            service_auth=True,
+            data=pdf,
+            headers={"Content-Type": "application/pdf", "X-Transcript-Message-Count": str(message_count)},
+        )
+        return result if isinstance(result, dict) else {}
+
+    async def close_discord_ticket(self, ticket_id: str, discord_user_id: int) -> JsonObject:
+        result = await self._request(
+            f"internal/discord/tickets/{quote(ticket_id, safe='')}/close",
+            method="POST",
+            service_auth=True,
+            json_body={"discordUserId": str(discord_user_id)},
+        )
+        return result if isinstance(result, dict) else {}
+
+    async def discord_reopen_queue(self) -> list[JsonObject]:
+        result = await self._request("internal/discord/reopen-queue", service_auth=True)
+        return result if isinstance(result, list) else []
+
+    async def mark_discord_ticket_reopened(
+        self, ticket_id: str, discord_user_id: int, guild_id: int, channel_id: int
+    ) -> JsonObject:
+        result = await self._request(
+            f"internal/discord/tickets/{quote(ticket_id, safe='')}/reopen-complete",
+            method="POST",
+            service_auth=True,
+            json_body={
+                "discordUserId": str(discord_user_id),
+                "discordGuildId": str(guild_id),
+                "discordChannelId": str(channel_id),
+            },
+        )
         return result if isinstance(result, dict) else {}
