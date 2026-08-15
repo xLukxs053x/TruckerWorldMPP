@@ -15,6 +15,7 @@ def token_for(client_id: str) -> str:
 def configure(monkeypatch: pytest.MonkeyPatch, client_id: str = "123456789012345678") -> None:
     monkeypatch.setenv("DISCORD_CLIENT_ID", client_id)
     monkeypatch.setenv("DISCORD_BOT_TOKEN", token_for(client_id))
+    monkeypatch.setenv("DISCORD_MEMBER_ROLE_ID", "1507686479541829772")
     monkeypatch.setenv("TWMP_API_URL", "https://example.test/api/v1/")
     monkeypatch.setenv("TWMP_WEB_URL", "https://example.test/")
     monkeypatch.setenv("TWMP_BOT_SERVICE_SECRET", "test-bot-service-secret-with-32-characters")
@@ -25,6 +26,7 @@ def test_loads_and_normalizes_configuration(monkeypatch: pytest.MonkeyPatch, tmp
     configure(monkeypatch)
     settings = Settings.load(tmp_path / "missing.env")
     assert settings.discord_client_id == 123456789012345678
+    assert settings.discord_member_role_id == 1507686479541829772
     assert settings.twmp_api_url == "https://example.test/api/v1"
     assert settings.twmp_web_url == "https://example.test"
     assert settings.twmp_primary_server_slug == "europe-1"

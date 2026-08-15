@@ -34,6 +34,7 @@ class AdminCog(commands.GroupCog, group_name="admin", group_description="Bot set
     async def show(self, interaction: discord.Interaction) -> None:
         assert interaction.guild
         settings = await self.bot.database.get_guild_settings(interaction.guild.id)
+        automatic_role_id = self.bot.settings.discord_member_role_id or settings.auto_role_id
         embed = base_embed("TruckerWorldMP Bot Configuration", f"Discord guild: **{interaction.guild.name}**")
         entries = [
             ("Welcome", settings.welcome_channel_id, "channel"),
@@ -42,7 +43,7 @@ class AdminCog(commands.GroupCog, group_name="admin", group_description="Bot set
             ("Announcements", settings.announcements_channel_id, "channel"),
             ("Ticket category", settings.ticket_category_id, "channel"),
             ("Support role", settings.support_role_id, "role"),
-            ("Automatic role", settings.auto_role_id, "role"),
+            ("Automatic member role", automatic_role_id, "role"),
         ]
         for label, snowflake, kind in entries:
             mention = (
@@ -96,6 +97,14 @@ class AdminCog(commands.GroupCog, group_name="admin", group_description="Bot set
         role: discord.Role,
     ) -> None:
         assert interaction.guild
+        if section == "automatic" and self.bot.settings.discord_member_role_id:
+            configured = interaction.guild.get_role(self.bot.settings.discord_member_role_id)
+            await interaction.response.send_message(
+                "The automatic member role is managed by `DISCORD_MEMBER_ROLE_ID` in `.env`"
+                + (f" and currently uses {configured.mention}." if configured else "."),
+                ephemeral=True,
+            )
+            return
         if role.is_default() or role.managed:
             await interaction.response.send_message("This Discord role cannot be used here.", ephemeral=True)
             return

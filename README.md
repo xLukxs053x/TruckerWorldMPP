@@ -165,6 +165,7 @@ The complete secret-free template is available in `.env.example`.
 | `TWMP_LOGO_URL` | Brand icon used in embed footers |
 | `TWMP_PRIMARY_SERVER_SLUG` | Primary server; must remain `europe-1` for this deployment |
 | `TWMP_BOT_SERVICE_SECRET` | Shared 32+ character secret; must match the API's `DISCORD_BOT_SERVICE_SECRET` |
+| `DISCORD_MEMBER_ROLE_ID` | Discord role assigned to new members; configured as `1507686479541829772` for TWMP |
 | `TWMP_ACCOUNT_HELP_IMAGE_URL` | Public English account-linking guide embedded in the account-required DM |
 | `BOT_DATABASE_PATH` | Local SQLite database path |
 | `COMMAND_SYNC_ON_START` | Synchronize slash commands at startup |

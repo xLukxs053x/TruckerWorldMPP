@@ -60,6 +60,7 @@ class Settings:
     discord_client_id: int
     discord_client_secret: str | None
     discord_guild_id: int | None
+    discord_member_role_id: int | None
     twmp_api_url: str
     twmp_web_url: str
     twmp_logo_url: str
@@ -110,6 +111,7 @@ class Settings:
             discord_client_id=int(client_id_raw),
             discord_client_secret=os.getenv("DISCORD_CLIENT_SECRET", "").strip() or None,
             discord_guild_id=_optional_snowflake("DISCORD_GUILD_ID"),
+            discord_member_role_id=_optional_snowflake("DISCORD_MEMBER_ROLE_ID"),
             twmp_api_url=api_url,
             twmp_web_url=web_url,
             twmp_logo_url=os.getenv("TWMP_LOGO_URL", f"{web_url}/twmp-icon.png").strip(),

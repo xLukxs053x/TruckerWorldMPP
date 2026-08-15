@@ -64,13 +64,16 @@ class CommunityCog(commands.GroupCog, group_name="ticket", group_description="Di
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member) -> None:
         settings = await self.bot.database.get_guild_settings(member.guild.id)
-        if settings.auto_role_id:
-            role = member.guild.get_role(settings.auto_role_id)
+        automatic_role_id = self.bot.settings.discord_member_role_id or settings.auto_role_id
+        if automatic_role_id:
+            role = member.guild.get_role(automatic_role_id)
             if role and member.guild.me and role < member.guild.me.top_role:
                 try:
                     await member.add_roles(role, reason="TruckerWorldMP automatic member role")
                 except discord.HTTPException:
                     LOGGER.exception("Could not assign the automatic role to %s", member)
+            elif role is None:
+                LOGGER.error("Configured automatic member role %d does not exist in guild %d", automatic_role_id, member.guild.id)
         channel = member.guild.get_channel(settings.welcome_channel_id) if settings.welcome_channel_id else None
         if isinstance(channel, discord.TextChannel):
             embed = base_embed(
