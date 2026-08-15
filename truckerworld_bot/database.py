@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -111,7 +111,7 @@ class Database:
         if field not in self.GUILD_FIELDS:
             raise ValueError(f"Unbekanntes Konfigurationsfeld: {field}")
         connection = self._connection()
-        timestamp = datetime.now(UTC).isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
         async with self._write_lock:
             await connection.execute(
                 "INSERT INTO guild_settings (guild_id, updated_at) VALUES (?, ?) ON CONFLICT(guild_id) DO NOTHING",
@@ -134,7 +134,7 @@ class Database:
 
     async def create_ticket(self, guild_id: int, channel_id: int, owner_id: int) -> TicketRecord:
         connection = self._connection()
-        timestamp = datetime.now(UTC).isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
         async with self._write_lock:
             cursor = await connection.execute(
                 "INSERT INTO tickets (guild_id, channel_id, owner_id, status, created_at) VALUES (?, ?, ?, 'open', ?)",
@@ -154,7 +154,7 @@ class Database:
         async with self._write_lock:
             cursor = await connection.execute(
                 "UPDATE tickets SET status = 'closed', closed_at = ? WHERE channel_id = ? AND status = 'open'",
-                (datetime.now(UTC).isoformat(), channel_id),
+                (datetime.now(timezone.utc).isoformat(), channel_id),
             )
             await connection.commit()
         return cursor.rowcount > 0
@@ -164,7 +164,7 @@ class Database:
         async with self._write_lock:
             cursor = await connection.execute(
                 "INSERT INTO warnings (guild_id, user_id, moderator_id, reason, created_at) VALUES (?, ?, ?, ?, ?)",
-                (guild_id, user_id, moderator_id, reason, datetime.now(UTC).isoformat()),
+                (guild_id, user_id, moderator_id, reason, datetime.now(timezone.utc).isoformat()),
             )
             await connection.commit()
         return int(cursor.lastrowid or 0)

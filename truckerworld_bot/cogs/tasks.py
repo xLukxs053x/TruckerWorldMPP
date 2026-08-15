@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 import discord
@@ -118,7 +118,7 @@ class BackgroundTasksCog(commands.Cog):
             await self._broadcast(embed, view=view)
         self._last_news_slug = latest_slug
 
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         upcoming = [item for item in convoys if (parse_datetime(item.get("departureAt")) or now) >= now]
         current_ids = {str(item.get("id") or item.get("slug")) for item in upcoming}
         if self._known_convoys is not None:

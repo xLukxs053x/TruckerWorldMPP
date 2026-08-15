@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import discord
@@ -27,7 +27,7 @@ def parse_datetime(value: str | None) -> datetime | None:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
-    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
 def discord_time(value: str | None, style: str = "F") -> str:
@@ -37,7 +37,7 @@ def discord_time(value: str | None, style: str = "F") -> str:
 
 def base_embed(title: str, description: str | None = None, *, color: discord.Color = BRAND_COLOR) -> discord.Embed:
     embed = discord.Embed(title=clipped(title, 256), description=clipped(description, 4096, "") or None, color=color)
-    embed.timestamp = datetime.now(UTC)
+    embed.timestamp = datetime.now(timezone.utc)
     return embed
 
 

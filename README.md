@@ -18,7 +18,7 @@ Der Python-Bot verbindet den Discord-Server mit der vorhandenen TruckerWorldMP-P
 
 ## Schnellstart unter Windows
 
-Python 3.12 oder neuer wird benötigt. Die echte `.env` liegt bereits lokal vor und wird durch `.gitignore` nicht
+Python 3.10 oder neuer wird benötigt. Die echte `.env` liegt bereits lokal vor und wird durch `.gitignore` nicht
 versioniert.
 
 ```powershell
@@ -132,4 +132,3 @@ der Zielmaschine angepasst werden. `data/` und `logs/` müssen für den Dienst b
 
 Das Token gehört ausschließlich in `.env` oder den Secret Store der Laufzeit. Wird es außerhalb einer geschützten
 Umgebung geteilt, sollte im Discord Developer Portal ein neues Token erzeugt und nur die lokale `.env` aktualisiert werden.
-

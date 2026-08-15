@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin
 
@@ -145,7 +145,7 @@ class PlatformCog(commands.GroupCog, group_name="twmp", group_description="Truck
     async def convoys(self, interaction: discord.Interaction, anzahl: app_commands.Range[int, 1, 10] = 5) -> None:
         await interaction.response.defer(thinking=True)
         convoys = await self.bot.platform.convoys()
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         upcoming = sorted(
             (item for item in convoys if (parse_datetime(item.get("departureAt")) or now) >= now),
             key=lambda item: item.get("departureAt", ""),

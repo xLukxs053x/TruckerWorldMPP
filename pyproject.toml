@@ -2,7 +2,7 @@
 name = "truckerworldmp-discord-bot"
 version = "1.0.0"
 description = "Discord community and platform bot for TruckerWorldMP"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 dependencies = [
   "discord.py==2.7.1",
   "aiohttp==3.14.3",
@@ -16,9 +16,8 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py312"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
 ignore = ["E501"]
-
