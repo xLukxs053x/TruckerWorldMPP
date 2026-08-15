@@ -41,8 +41,10 @@ def base_embed(title: str, description: str | None = None, *, color: discord.Col
     return embed
 
 
-def error_embed(message: str) -> discord.Embed:
-    return base_embed("Something went wrong", clipped(message, 3500), color=DANGER_COLOR)
+def error_embed(title: str, message: str | None = None) -> discord.Embed:
+    if message is None:
+        title, message = "Something went wrong", title
+    return base_embed(title, clipped(message, 3500), color=DANGER_COLOR)
 
 
 def success_embed(title: str, message: str) -> discord.Embed:
