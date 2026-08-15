@@ -109,12 +109,12 @@ class TruckerWorldBot(commands.Bot):
                 await message.add_reaction("\u26a0\ufe0f")
                 if error.code == "SUPPORT_CLOSED":
                     notice = (
-                        "This ticket is closed, so your Discord message was not added to My Support. "
-                        "Request reopening from My Support within the 20-day window before continuing the conversation."
+                        "This ticket is closed, so your Discord message was not added to TWMP Support. "
+                        "Request reopening from TWMP Support within the 20-day window before continuing the conversation."
                     )
                 else:
                     notice = (
-                        "Your message remains visible in Discord, but it could not be synchronized to My Support. "
+                        "Your message remains visible in Discord, but it could not be synchronized to TWMP Support. "
                         "Make sure this Discord account is linked to TWMP, then contact a platform administrator if the warning remains."
                     )
                 await message.author.send(notice)

@@ -33,7 +33,7 @@ async def test_mapped_message_uses_platform_status_when_local_ticket_is_closed(m
         id=500,
         author=SimpleNamespace(id=400, bot=False),
         channel=FakeTextChannel(),
-        content="This must appear in My Support.",
+        content="This must appear in TWMP Support.",
         attachments=[],
     )
 
@@ -42,7 +42,7 @@ async def test_mapped_message_uses_platform_status_when_local_ticket_is_closed(m
     platform.sync_discord_message.assert_awaited_once_with(
         ticket.platform_ticket_id,
         discord_user_id=400,
-        body="This must appear in My Support.",
+        body="This must appear in TWMP Support.",
         external_message_id=500,
         attachment_urls=[],
     )

@@ -260,7 +260,7 @@ class BackgroundTasksCog(commands.Cog):
             requester = ticket.get("requester")
             from_requester = isinstance(requester, dict) and requester.get("id") == author.get("id")
             embed = base_embed(
-                "Reply from My Support",
+                "Reply from TWMP Support",
                 str(message.get("body", ""))[:4000],
                 color=discord.Color.from_str("#5865f2") if from_requester else discord.Color.from_str("#ff5a1f"),
             )
@@ -268,7 +268,7 @@ class BackgroundTasksCog(commands.Cog):
             attachments = message.get("attachmentUrls")
             if isinstance(attachments, list) and attachments:
                 embed.add_field(name="Attachments", value="\n".join(str(url) for url in attachments)[:1024], inline=False)
-            embed.set_footer(text=f"Synced from My Support - {ticket.get('reference', 'Support ticket')}")
+            embed.set_footer(text=f"Synced from TWMP Support - {ticket.get('reference', 'Support ticket')}")
             try:
                 sent = await channel.send(embed=embed)
                 await self.bot.platform.mark_discord_message_delivered(message_id, sent.id)

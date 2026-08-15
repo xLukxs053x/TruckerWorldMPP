@@ -17,7 +17,7 @@ selection.
 - automatic news and Europe 1 convoy announcements
 - welcome messages, farewell messages, automatic member role, and Discord logs
 - account-gated private tickets linked to the user's TWMP Discord connection
-- two-way Discord/My Support synchronization and protected PDF transcripts
+- two-way Discord/TWMP Support synchronization and protected PDF transcripts
 - website reopen requests for closed tickets within a 20-day window
 - Discord warnings, timeouts, timeout removal, and message cleanup
 - complete per-guild setup through `/admin`
@@ -104,7 +104,7 @@ After installing the bot, a guild administrator should run:
 
 The bot role must be above the automatic member role and above any member roles the bot needs to moderate.
 Only Discord users with a linked TWMP account can open a ticket. Closing does not delete the channel: it locks the
-requester, uploads a private PDF transcript to My Support, and keeps the channel available to support staff. For 20
+requester, uploads a private PDF transcript to TWMP Support, and keeps the channel available to support staff. For 20
 days the requester can apply to reopen the same case on the website; after approval, the bot unlocks or recreates
 the mapped channel automatically.
 

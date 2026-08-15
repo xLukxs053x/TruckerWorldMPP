@@ -43,12 +43,12 @@ class CommunityCog(commands.GroupCog, group_name="ticket", group_description="Di
         )
         embed.add_field(
             name="One continuous support case",
-            value="Use your existing ticket whenever possible. Tickets closed within the last 20 days can be submitted for reopening from My Support.",
+            value="Use your existing ticket whenever possible. Tickets closed within the last 20 days can be submitted for reopening from TWMP Support.",
             inline=False,
         )
         embed.add_field(
             name="Private transcript",
-            value="The conversation is synchronized with your TWMP account. Closing the ticket creates a private PDF transcript in My Support.",
+            value="The conversation is synchronized with your TWMP account. Closing the ticket creates a private PDF transcript in TWMP Support.",
             inline=False,
         )
         embed.add_field(

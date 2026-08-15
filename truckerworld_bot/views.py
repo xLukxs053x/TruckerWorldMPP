@@ -74,13 +74,15 @@ async def create_ticket(interaction: discord.Interaction, bot: TruckerWorldBot) 
     if isinstance(conflict, dict):
         view = discord.ui.View(timeout=600)
         ticket_id = str(conflict.get("ticketId", ""))
-        view.add_item(discord.ui.Button(label="Open My Support", url=f"{bot.settings.twmp_web_url}/account/support?ticket={ticket_id}", emoji="\U0001f4c2"))
-        embed = error_embed("Continue your existing support case", str(conflict.get("message", "Open My Support to continue.")))
-        embed.add_field(name="20-day policy", value="Recently closed tickets can be submitted for reopening from My Support. Please do not create a duplicate.", inline=False)
+        view.add_item(discord.ui.Button(label="Open TWMP Support", url=f"{bot.settings.twmp_web_url}/account/support?ticket={ticket_id}", emoji="\U0001f4c2"))
+        conflict_message = str(conflict.get("message", "Open TWMP Support to continue."))
+        conflict_message = re.sub(r"\bMy Support\b", "TWMP Support", conflict_message, flags=re.IGNORECASE)
+        embed = error_embed("Continue your existing support case", conflict_message)
+        embed.add_field(name="20-day policy", value="Recently closed tickets can be submitted for reopening from TWMP Support. Please do not create a duplicate.", inline=False)
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
         return
     embed = base_embed("Start a private support ticket", "Your TWMP account is linked. Choose the area that best matches your request, then describe the issue in the form.")
-    embed.add_field(name="Private & synchronized", value="Messages are synchronized with My Support. A private PDF transcript is saved to your account when the ticket closes.", inline=False)
+    embed.add_field(name="Private & synchronized", value="Messages are synchronized with TWMP Support. A private PDF transcript is saved to your account when the ticket closes.", inline=False)
     embed.add_field(name="Before you continue", value="Use one ticket for one issue and never send passwords, session cookies, tokens, or recovery codes.", inline=False)
     await interaction.followup.send(embed=embed, view=TicketCategoryView(bot, interaction.user.id), ephemeral=True)
 
@@ -127,13 +129,13 @@ async def _create_ticket_channel(interaction: discord.Interaction, bot: TruckerW
     except (PlatformAPIError, KeyError, RuntimeError):
         LOGGER.exception("Could not register the Discord ticket on the TWMP platform")
         await channel.delete(reason="Platform ticket registration failed")
-        await interaction.followup.send(embed=error_embed("The ticket could not be registered with My Support. No channel was kept; please try again."), ephemeral=True)
+        await interaction.followup.send(embed=error_embed("The ticket could not be registered with TWMP Support. No channel was kept; please try again."), ephemeral=True)
         return
     embed = base_embed(reference, subject)
     embed.add_field(name="Category", value=CATEGORIES[category_key][0])
     embed.add_field(name="Created by", value=f"{interaction.user.mention} - linked TWMP account")
     embed.add_field(name="Your request", value=description[:1024], inline=False)
-    embed.add_field(name="How this ticket works", value="Continue the conversation in this channel. Messages are mirrored to My Support, and closing creates a private PDF transcript. A closed ticket can be submitted for reopening from the website for 20 days.", inline=False)
+    embed.add_field(name="How this ticket works", value="Continue the conversation in this channel. Messages are mirrored to TWMP Support, and closing creates a private PDF transcript. A closed ticket can be submitted for reopening from the website for 20 days.", inline=False)
     await channel.send(content=f"{interaction.user.mention} {support_role.mention}", embed=embed, view=TicketCloseView(bot), allowed_mentions=discord.AllowedMentions(users=True, roles=True, everyone=False))
     await interaction.followup.send(embed=success_embed("Ticket created", f"{reference} is ready in {channel.mention}."), ephemeral=True)
     LOGGER.info("Created Discord ticket %d mapped to %s", ticket.id, reference)
@@ -174,10 +176,10 @@ async def close_ticket(interaction: discord.Interaction, bot: TruckerWorldBot) -
         if owner:
             await interaction.channel.set_permissions(owner, view_channel=True, send_messages=False, read_message_history=True)
         await interaction.channel.edit(name=f"closed-{(ticket.platform_reference or ticket.id)}".lower()[:100], topic=f"{ticket.platform_reference or ticket.id} - closed by {interaction.user}", reason=f"Ticket closed by {interaction.user}")
-        closed_embed = success_embed("Ticket closed & transcript archived", f"Closed by {interaction.user.mention}. The private PDF is available in **My Support**.")
+        closed_embed = success_embed("Ticket closed & transcript archived", f"Closed by {interaction.user.mention}. The private PDF is available in **TWMP Support**.")
         closed_embed.add_field(name="Need to continue?", value="For the next 20 days, request to reopen this ticket from your TWMP account instead of creating a duplicate.", inline=False)
         view = discord.ui.View(timeout=None)
-        view.add_item(discord.ui.Button(label="Open My Support", url=f"{bot.settings.twmp_web_url}/account/support?ticket={ticket.platform_ticket_id}", emoji="\U0001f4c4"))
+        view.add_item(discord.ui.Button(label="Open TWMP Support", url=f"{bot.settings.twmp_web_url}/account/support?ticket={ticket.platform_ticket_id}", emoji="\U0001f4c4"))
         await interaction.channel.send(embed=closed_embed, view=view)
         if owner:
             try:
@@ -186,7 +188,7 @@ async def close_ticket(interaction: discord.Interaction, bot: TruckerWorldBot) -
                 LOGGER.info("Could not DM closed-ticket notice to %d", owner.id)
     except discord.HTTPException:
         LOGGER.exception("Ticket channel %d could not be fully locked", interaction.channel.id)
-    await interaction.followup.send("Ticket closed. The PDF transcript is now available in My Support.", ephemeral=True)
+    await interaction.followup.send("Ticket closed. The PDF transcript is now available in TWMP Support.", ephemeral=True)
 
 
 class TicketDetailsModal(discord.ui.Modal, title="Tell us what happened"):
