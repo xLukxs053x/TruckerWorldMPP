@@ -110,7 +110,7 @@ class TruckerWorldBot(commands.Bot):
                 if error.code == "SUPPORT_CLOSED":
                     notice = (
                         "This ticket is closed, so your Discord message was not added to TWMP Support. "
-                        "Request reopening from TWMP Support within the 20-day window before continuing the conversation."
+                        "Reopen the same ticket in TWMP Support within the 20-day window before continuing the conversation."
                     )
                 else:
                     notice = (

@@ -43,7 +43,7 @@ class CommunityCog(commands.GroupCog, group_name="ticket", group_description="Di
         )
         embed.add_field(
             name="One continuous support case",
-            value="Use your existing ticket whenever possible. Tickets closed within the last 20 days can be submitted for reopening from TWMP Support.",
+            value="Use your existing ticket whenever possible. Tickets closed within the last 20 days can be reopened directly in TWMP Support.",
             inline=False,
         )
         embed.add_field(

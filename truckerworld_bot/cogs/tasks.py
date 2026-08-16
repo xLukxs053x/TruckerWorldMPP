@@ -9,6 +9,7 @@ from discord.ext import commands, tasks
 
 from ..api import PlatformAPIError
 from ..embeds import STATUS_ICONS, STATUS_LABELS, base_embed, branded, clipped, discord_time, parse_datetime
+from ..views import TicketCloseView
 
 if TYPE_CHECKING:
     from ..bot import TruckerWorldBot
@@ -160,7 +161,7 @@ class BackgroundTasksCog(commands.Cog):
     async def before_announcement_watch(self) -> None:
         await self.bot.wait_until_ready()
 
-    @tasks.loop(seconds=60)
+    @tasks.loop(seconds=5)
     async def ticket_reopen_watch(self) -> None:
         try:
             queued = await self.bot.platform.discord_reopen_queue()
@@ -203,7 +204,7 @@ class BackgroundTasksCog(commands.Cog):
             try:
                 if isinstance(channel, discord.TextChannel):
                     await channel.set_permissions(owner, view_channel=True, send_messages=True, read_message_history=True, attach_files=True, embed_links=True)
-                    await channel.edit(name=f"{reference.lower()}-{owner.display_name.lower()}"[:100], topic=f"{reference} - reopened after website approval")
+                    await channel.edit(name=f"{reference.lower()}-{owner.display_name.lower()}"[:100], topic=f"{reference} - reopened from TWMP Support")
                 else:
                     overwrites = {
                         guild.default_role: discord.PermissionOverwrite(view_channel=False),
@@ -211,16 +212,29 @@ class BackgroundTasksCog(commands.Cog):
                         support_role: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True, attach_files=True, embed_links=True),
                         guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True, manage_channels=True, manage_messages=True),
                     }
-                    channel = await guild.create_text_channel(f"{reference.lower()}-{owner.display_name.lower()}"[:100], category=category, overwrites=overwrites, topic=f"{reference} - reopened after website approval", reason=f"Approved reopen request for {reference}")
+                    channel = await guild.create_text_channel(f"{reference.lower()}-{owner.display_name.lower()}"[:100], category=category, overwrites=overwrites, topic=f"{reference} - reopened from TWMP Support", reason=f"Reopened from TWMP Support: {reference}")
                 local = await self.bot.database.ticket_by_platform_id(ticket_id)
                 if local:
                     await self.bot.database.reopen_ticket(ticket_id, guild.id, channel.id, owner.id)
                 else:
                     await self.bot.database.create_ticket(guild.id, channel.id, owner.id, platform_ticket_id=ticket_id, platform_reference=reference)
                 await self.bot.platform.mark_discord_ticket_reopened(ticket_id, owner.id, guild.id, channel.id)
-                embed = base_embed("Ticket reopened", f"The reopen request for **{reference}** was approved. Continue the existing conversation here; there is no need to create a new ticket.")
+                embed = base_embed(
+                    "TWMP Support ticket reopened",
+                    f"**{reference}** was reopened in TWMP Support. This Discord channel and the existing web conversation are synchronized again.",
+                )
                 embed.add_field(name="Original topic", value=str(platform_ticket.get("subject", "Support request"))[:1024], inline=False)
-                await channel.send(content=f"{owner.mention} {support_role.mention}", embed=embed, allowed_mentions=discord.AllowedMentions(users=True, roles=True, everyone=False))
+                embed.add_field(
+                    name="Two-way synchronization",
+                    value="Messages sent here appear in TWMP Support, and replies from TWMP Support appear here in Discord.",
+                    inline=False,
+                )
+                await channel.send(
+                    content=f"{owner.mention} {support_role.mention}",
+                    embed=embed,
+                    view=TicketCloseView(self.bot),
+                    allowed_mentions=discord.AllowedMentions(users=True, roles=True, everyone=False),
+                )
             except (discord.HTTPException, PlatformAPIError):
                 LOGGER.exception("Could not reopen Discord ticket %s", reference)
 

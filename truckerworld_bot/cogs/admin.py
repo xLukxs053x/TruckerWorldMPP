@@ -162,7 +162,7 @@ class AdminCog(commands.GroupCog, group_name="admin", group_description="Bot set
         )
         embed.add_field(
             name="Synchronized support history",
-            value="One active case per account. Closing stores a private PDF in TWMP Support; recent tickets can be submitted for reopening for 20 days.",
+            value="One active case per account. Closing stores a private PDF in TWMP Support; the same ticket can be reopened there for 20 days.",
             inline=False,
         )
         embed.add_field(
