@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, call
 
+import discord
 import pytest
 
 from truckerworld_bot.cogs.tasks import BackgroundTasksCog
@@ -9,6 +10,29 @@ from truckerworld_bot.database import TicketRecord
 
 def test_reopen_queue_is_polled_for_near_real_time_sync() -> None:
     assert BackgroundTasksCog.ticket_reopen_watch.seconds == 5.0
+
+
+@pytest.mark.asyncio
+async def test_status_watch_sets_dnd_with_twmp_custom_activity() -> None:
+    platform = SimpleNamespace(
+        primary_server=AsyncMock(
+            return_value={"id": "eu", "status": "online", "players": 42, "capacity": 500}
+        )
+    )
+    bot = SimpleNamespace(
+        platform=platform,
+        settings=SimpleNamespace(twmp_primary_server_slug="europe-1"),
+        change_presence=AsyncMock(),
+    )
+    cog = BackgroundTasksCog(bot)
+
+    await BackgroundTasksCog.status_watch.coro(cog)
+
+    bot.change_presence.assert_awaited_once()
+    presence = bot.change_presence.await_args.kwargs
+    assert presence["status"] is discord.Status.dnd
+    assert isinstance(presence["activity"], discord.CustomActivity)
+    assert presence["activity"].name == "TWMP"
 
 
 @pytest.mark.asyncio

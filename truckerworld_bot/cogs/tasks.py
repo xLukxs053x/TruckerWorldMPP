@@ -164,7 +164,10 @@ class BackgroundTasksCog(commands.Cog):
             server = await self.bot.platform.primary_server(self.bot.settings.twmp_primary_server_slug)
         except PlatformAPIError:
             LOGGER.warning("Europe 1 status check failed")
-            await self.bot.change_presence(status=discord.Status.idle, activity=discord.Game("Europe 1 unavailable"))
+            await self.bot.change_presence(
+                status=discord.Status.dnd,
+                activity=discord.CustomActivity(name="TWMP"),
+            )
             return
 
         state = str(server.get("status", "offline"))
@@ -173,8 +176,8 @@ class BackgroundTasksCog(commands.Cog):
         operational = state == "online"
         signature = (str(server.get("id", self.bot.settings.twmp_primary_server_slug)), state)
         await self.bot.change_presence(
-            status=discord.Status.online if operational else discord.Status.idle,
-            activity=discord.Game(f"Europe 1 · {players}/{capacity} drivers · /twmp status"),
+            status=discord.Status.dnd,
+            activity=discord.CustomActivity(name="TWMP"),
         )
         previous = self._last_status_signature
         self._last_status_signature = signature
