@@ -161,8 +161,8 @@ class AdminCog(commands.GroupCog, group_name="admin", group_description="Bot set
             "Only Discord users with a linked TruckerWorldMP account can continue.",
         )
         embed.add_field(
-            name="Synchronized support history",
-            value="One active case per account. Closing stores a private PDF in TWMP Support; the same ticket can be reopened there for 20 days.",
+            name="One support conversation",
+            value="The request is attached to TWMP Support. Once the case continues on the website, the Discord ticket closes for replies and all further messages are sent there.",
             inline=False,
         )
         embed.add_field(

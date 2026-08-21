@@ -82,7 +82,7 @@ async def create_ticket(interaction: discord.Interaction, bot: TruckerWorldBot) 
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
         return
     embed = base_embed("Start a private support ticket", "Your TWMP account is linked. Choose the area that best matches your request, then describe the issue in the form.")
-    embed.add_field(name="Private & synchronized", value="Messages are synchronized with TWMP Support. A private PDF transcript is saved to your account when the ticket closes.", inline=False)
+    embed.add_field(name="One case, one reply location", value="Your Discord request is saved to TWMP Support. Once the conversation continues on the website, this Discord channel is locked and all further replies belong there.", inline=False)
     embed.add_field(name="Before you continue", value="Use one ticket for one issue and never send passwords, session cookies, tokens, or recovery codes.", inline=False)
     await interaction.followup.send(embed=embed, view=TicketCategoryView(bot, interaction.user.id), ephemeral=True)
 
@@ -135,7 +135,7 @@ async def _create_ticket_channel(interaction: discord.Interaction, bot: TruckerW
     embed.add_field(name="Category", value=CATEGORIES[category_key][0])
     embed.add_field(name="Created by", value=f"{interaction.user.mention} - linked TWMP account")
     embed.add_field(name="Your request", value=description[:1024], inline=False)
-    embed.add_field(name="How this ticket works", value="Continue the conversation in this channel. Messages are mirrored to TWMP Support, and closing creates a private PDF transcript. For 20 days, the same closed ticket can be reopened directly in TWMP Support.", inline=False)
+    embed.add_field(name="How this ticket works", value="Your messages here are saved with the TWMP case. As soon as the conversation continues on the website, this Discord channel closes for replies and every further answer must be sent in TWMP Support.", inline=False)
     await channel.send(content=f"{interaction.user.mention} {support_role.mention}", embed=embed, view=TicketCloseView(bot), allowed_mentions=discord.AllowedMentions(users=True, roles=True, everyone=False))
     await interaction.followup.send(embed=success_embed("Ticket created", f"{reference} is ready in {channel.mention}."), ephemeral=True)
     LOGGER.info("Created Discord ticket %d mapped to %s", ticket.id, reference)

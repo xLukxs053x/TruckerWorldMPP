@@ -17,8 +17,8 @@ selection.
 - automatic news and Europe 1 convoy announcements
 - welcome messages, farewell messages, automatic member role, and Discord logs
 - account-gated private tickets linked to the user's TWMP Discord connection
-- two-way Discord/TWMP Support synchronization and protected PDF transcripts
-- direct reopening of the same closed ticket in TWMP Support within a 20-day window
+- Discord-to-web support handoff: the Discord channel locks when the conversation continues in TWMP Support
+- protected PDF transcripts and web-only reopening of the same closed ticket within a 20-day window
 - Discord warnings, timeouts, timeout removal, and message cleanup
 - complete per-guild setup through `/admin`
 - SQLite with WAL mode for guild settings, tickets, and Discord warnings
@@ -30,7 +30,7 @@ selection.
 - `Server Members Intent` and `Message Content Intent` enabled in the Discord Developer Portal
 - access to `https://truckerworldmp.com/api/v1`
 
-`Message Content Intent` is required so ticket messages can be synchronized and included in the PDF transcript.
+`Message Content Intent` is required so Discord ticket messages can be attached to the web case and included in the PDF transcript before the channel is locked.
 
 ## Windows installation
 
@@ -170,7 +170,7 @@ The complete secret-free template is available in `.env.example`.
 | `BOT_DATABASE_PATH` | Local SQLite database path |
 | `COMMAND_SYNC_ON_START` | Synchronize slash commands at startup |
 | `ENABLE_MEMBER_INTENT` | Enables member events, welcome messages, and automatic roles |
-| `ENABLE_MESSAGE_CONTENT_INTENT` | Enables ticket synchronization and PDF transcript content |
+| `ENABLE_MESSAGE_CONTENT_INTENT` | Enables Discord request capture and PDF transcript content before web handoff |
 | `STATUS_POLL_INTERVAL_SECONDS` | Europe 1 presence/status interval, minimum 30 seconds |
 | `ANNOUNCEMENT_POLL_INTERVAL_SECONDS` | News/convoy polling interval, minimum 60 seconds |
 | `REQUEST_TIMEOUT_SECONDS` | Platform HTTP timeout |

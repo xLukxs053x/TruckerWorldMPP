@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
@@ -9,7 +10,7 @@ from discord.ext import commands, tasks
 
 from ..api import PlatformAPIError
 from ..embeds import STATUS_ICONS, STATUS_LABELS, base_embed, branded, clipped, discord_time, parse_datetime
-from ..views import TicketCloseView
+from ..transcript import TranscriptMessage, build_ticket_transcript
 
 if TYPE_CHECKING:
     from ..bot import TruckerWorldBot
@@ -55,6 +56,107 @@ class BackgroundTasksCog(commands.Cog):
                 await channel.send(embed=branded(embed.copy(), self.bot.settings.twmp_logo_url), view=view)
             except discord.HTTPException:
                 LOGGER.exception("Could not send automatic announcement to channel %d", channel.id)
+
+    async def _move_discord_ticket_to_web(self, platform_ticket: dict[str, object]) -> int | None:
+        discord_context = platform_ticket.get("discord")
+        if not isinstance(discord_context, dict):
+            return None
+        try:
+            ticket_id = str(platform_ticket["id"])
+            reference = str(platform_ticket["reference"])
+            channel_id = int(discord_context["channelId"])
+            owner_id = int(discord_context["userId"])
+        except (KeyError, TypeError, ValueError):
+            LOGGER.error("Invalid Discord context for web handoff: %r", platform_ticket)
+            return None
+
+        local = await self.bot.database.ticket_by_platform_id(ticket_id)
+        channel = self.bot.get_channel(channel_id)
+        if not isinstance(channel, discord.TextChannel):
+            if local and local.status == "open":
+                await self.bot.database.close_ticket(local.channel_id)
+            LOGGER.info("Discord channel %d is already unavailable; %s remains active on the web", channel_id, reference)
+            return channel_id
+        if local and local.status != "open":
+            return channel.last_message_id or channel.id
+
+        guild = channel.guild
+        owner = guild.get_member(owner_id)
+        if owner is None:
+            try:
+                owner = await guild.fetch_member(owner_id)
+            except discord.HTTPException:
+                owner = None
+        settings = await self.bot.database.get_guild_settings(guild.id)
+        support_role = guild.get_role(settings.support_role_id) if settings.support_role_id else None
+
+        if owner:
+            await channel.set_permissions(owner, view_channel=True, send_messages=False, read_message_history=True)
+        if support_role:
+            await channel.set_permissions(support_role, view_channel=True, send_messages=False, read_message_history=True)
+        await channel.edit(
+            name=f"web-{reference}".lower()[:100],
+            topic=f"{reference} - continued in TWMP Support (web only)",
+            reason=f"Support conversation moved to TWMP Support: {reference}",
+        )
+
+        if not platform_ticket.get("transcript") and local:
+            try:
+                history = [message async for message in channel.history(limit=None, oldest_first=True)]
+                transcript_messages = [
+                    TranscriptMessage(
+                        author=message.author.display_name,
+                        author_id=message.author.id,
+                        created_at=message.created_at,
+                        content=message.content,
+                        attachments=tuple(attachment.url for attachment in message.attachments),
+                        is_bot=message.author.bot,
+                    )
+                    for message in history
+                ]
+                requester = platform_ticket.get("requester")
+                requester_name = str(requester.get("displayName", owner or owner_id)) if isinstance(requester, dict) else str(owner or owner_id)
+                pdf, message_count = await asyncio.to_thread(
+                    build_ticket_transcript,
+                    reference=reference,
+                    subject=str(platform_ticket.get("subject", "Discord support ticket")),
+                    category=str(platform_ticket.get("category", "Discord support")),
+                    requester=requester_name,
+                    opened_at=datetime.fromisoformat(local.created_at),
+                    closed_by="Moved to TWMP Support",
+                    messages=transcript_messages,
+                )
+                await self.bot.platform.upload_ticket_transcript(ticket_id, pdf, message_count)
+            except (discord.HTTPException, PlatformAPIError, ValueError):
+                LOGGER.exception("Could not archive Discord history during web handoff for %s", reference)
+
+        view = discord.ui.View(timeout=None)
+        view.add_item(
+            discord.ui.Button(
+                label="Continue in TWMP Support",
+                url=f"{self.bot.settings.twmp_web_url}/account/support?ticket={ticket_id}",
+                emoji="\U0001f310",
+            )
+        )
+        embed = base_embed(
+            "Conversation moved to TWMP Support",
+            f"**{reference}** is still open, but this Discord ticket is now closed for replies.",
+        )
+        embed.add_field(
+            name="Reply on the website",
+            value="Open TWMP Support and send every further message there. Discord and web replies are no longer handled in parallel.",
+            inline=False,
+        )
+        notice = await channel.send(embed=embed, view=view)
+        if local and local.status == "open":
+            await self.bot.database.close_ticket(local.channel_id)
+        if owner:
+            try:
+                await owner.send(embed=embed, view=view)
+            except discord.HTTPException:
+                LOGGER.info("Could not DM web-handoff notice to %d", owner.id)
+        LOGGER.info("Closed Discord replies for %s; conversation continues in TWMP Support", reference)
+        return notice.id
 
     @tasks.loop(seconds=60)
     async def status_watch(self) -> None:
@@ -194,49 +296,42 @@ class BackgroundTasksCog(commands.Cog):
                 try:
                     owner = await guild.fetch_member(owner_id)
                 except discord.HTTPException:
-                    continue
-            settings = await self.bot.database.get_guild_settings(guild.id)
-            support_role = guild.get_role(settings.support_role_id) if settings.support_role_id else None
-            category = guild.get_channel(settings.ticket_category_id) if settings.ticket_category_id else None
-            if support_role is None or not isinstance(category, discord.CategoryChannel) or guild.me is None:
-                continue
+                    owner = None
             channel = guild.get_channel(channel_id)
             try:
                 if isinstance(channel, discord.TextChannel):
-                    await channel.set_permissions(owner, view_channel=True, send_messages=True, read_message_history=True, attach_files=True, embed_links=True)
-                    await channel.edit(name=f"{reference.lower()}-{owner.display_name.lower()}"[:100], topic=f"{reference} - reopened from TWMP Support")
-                else:
-                    overwrites = {
-                        guild.default_role: discord.PermissionOverwrite(view_channel=False),
-                        owner: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True, attach_files=True, embed_links=True),
-                        support_role: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True, attach_files=True, embed_links=True),
-                        guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True, manage_channels=True, manage_messages=True),
-                    }
-                    channel = await guild.create_text_channel(f"{reference.lower()}-{owner.display_name.lower()}"[:100], category=category, overwrites=overwrites, topic=f"{reference} - reopened from TWMP Support", reason=f"Reopened from TWMP Support: {reference}")
+                    settings = await self.bot.database.get_guild_settings(guild.id)
+                    support_role = guild.get_role(settings.support_role_id) if settings.support_role_id else None
+                    if owner:
+                        await channel.set_permissions(owner, view_channel=True, send_messages=False, read_message_history=True)
+                    if support_role:
+                        await channel.set_permissions(support_role, view_channel=True, send_messages=False, read_message_history=True)
+                    await channel.edit(name=f"web-{reference}".lower()[:100], topic=f"{reference} - reopened in TWMP Support (web only)")
                 local = await self.bot.database.ticket_by_platform_id(ticket_id)
-                if local:
-                    await self.bot.database.reopen_ticket(ticket_id, guild.id, channel.id, owner.id)
-                else:
-                    await self.bot.database.create_ticket(guild.id, channel.id, owner.id, platform_ticket_id=ticket_id, platform_reference=reference)
-                await self.bot.platform.mark_discord_ticket_reopened(ticket_id, owner.id, guild.id, channel.id)
+                if local and local.status == "open":
+                    await self.bot.database.close_ticket(local.channel_id)
+                await self.bot.platform.mark_discord_ticket_reopened(ticket_id, owner_id, guild.id, channel_id)
                 embed = base_embed(
-                    "TWMP Support ticket reopened",
-                    f"**{reference}** was reopened in TWMP Support. This Discord channel and the existing web conversation are synchronized again.",
+                    "Ticket reopened on the website",
+                    f"**{reference}** is open again in TWMP Support. This Discord channel remains closed for replies.",
                 )
                 embed.add_field(name="Original topic", value=str(platform_ticket.get("subject", "Support request"))[:1024], inline=False)
                 embed.add_field(
-                    name="Two-way synchronization",
-                    value="Messages sent here appear in TWMP Support, and replies from TWMP Support appear here in Discord.",
+                    name="Continue in TWMP Support",
+                    value="Send every new message on the website. The Discord ticket will not be reopened or synchronized again.",
                     inline=False,
                 )
-                await channel.send(
-                    content=f"{owner.mention} {support_role.mention}",
-                    embed=embed,
-                    view=TicketCloseView(self.bot),
-                    allowed_mentions=discord.AllowedMentions(users=True, roles=True, everyone=False),
-                )
+                view = discord.ui.View(timeout=None)
+                view.add_item(discord.ui.Button(label="Open TWMP Support", url=f"{self.bot.settings.twmp_web_url}/account/support?ticket={ticket_id}", emoji="\U0001f310"))
+                if isinstance(channel, discord.TextChannel):
+                    await channel.send(embed=embed, view=view)
+                if owner:
+                    try:
+                        await owner.send(embed=embed, view=view)
+                    except discord.HTTPException:
+                        LOGGER.info("Could not DM web-reopen notice to %d", owner.id)
             except (discord.HTTPException, PlatformAPIError):
-                LOGGER.exception("Could not reopen Discord ticket %s", reference)
+                LOGGER.exception("Could not complete web-only reopening for %s", reference)
 
     @ticket_reopen_watch.before_loop
     async def before_ticket_reopen_watch(self) -> None:
@@ -254,40 +349,27 @@ class BackgroundTasksCog(commands.Cog):
                 error.status,
             )
             return
+        handoff_receipts: dict[str, int] = {}
         for item in items:
             ticket = item.get("ticket")
             message = item.get("message")
             if not isinstance(ticket, dict) or not isinstance(message, dict) or not isinstance(ticket.get("discord"), dict):
                 continue
-            discord_context = ticket["discord"]
             try:
-                channel_id = int(discord_context["channelId"])
+                ticket_id = str(ticket["id"])
                 message_id = str(message["id"])
-                author = message["author"]
-                if not isinstance(author, dict):
-                    continue
             except (KeyError, TypeError, ValueError):
                 continue
-            channel = self.bot.get_channel(channel_id)
-            if not isinstance(channel, discord.TextChannel):
-                continue
-            requester = ticket.get("requester")
-            from_requester = isinstance(requester, dict) and requester.get("id") == author.get("id")
-            embed = base_embed(
-                "Reply from TWMP Support",
-                str(message.get("body", ""))[:4000],
-                color=discord.Color.from_str("#5865f2") if from_requester else discord.Color.from_str("#ff5a1f"),
-            )
-            embed.add_field(name="Author", value=f"{author.get('displayName', 'TWMP user')} - {author.get('publicId', 'linked account')}", inline=False)
-            attachments = message.get("attachmentUrls")
-            if isinstance(attachments, list) and attachments:
-                embed.add_field(name="Attachments", value="\n".join(str(url) for url in attachments)[:1024], inline=False)
-            embed.set_footer(text=f"Synced from TWMP Support - {ticket.get('reference', 'Support ticket')}")
             try:
-                sent = await channel.send(embed=embed)
-                await self.bot.platform.mark_discord_message_delivered(message_id, sent.id)
+                receipt_id = handoff_receipts.get(ticket_id)
+                if receipt_id is None:
+                    receipt_id = await self._move_discord_ticket_to_web(ticket)
+                    if receipt_id is None:
+                        continue
+                    handoff_receipts[ticket_id] = receipt_id
+                await self.bot.platform.mark_discord_message_delivered(message_id, receipt_id)
             except (discord.HTTPException, PlatformAPIError):
-                LOGGER.exception("Could not deliver website support message %s to Discord", message_id)
+                LOGGER.exception("Could not close Discord replies after website message %s", message_id)
 
     @ticket_message_outbox.before_loop
     async def before_ticket_message_outbox(self) -> None:

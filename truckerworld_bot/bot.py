@@ -78,12 +78,9 @@ class TruckerWorldBot(commands.Bot):
         if message.author.bot or not isinstance(message.channel, discord.TextChannel):
             return
         ticket = await self.database.ticket_by_channel(message.channel.id)
-        # The platform owns the authoritative support lifecycle. A website-side
-        # status change can legitimately happen before the local Discord ticket
-        # record is updated (for example while a close/reopen action crosses the
-        # message outbox). Always offer mapped channel messages to the API and
-        # let it reject tickets that are actually closed.
-        if not ticket or not ticket.platform_ticket_id:
+        # Once a conversation moves to TWMP Support, the Discord mapping is
+        # closed locally and must never accept another Discord-side reply.
+        if not ticket or ticket.status != "open" or not ticket.platform_ticket_id:
             return
         body = message.content.strip()
         if not body and message.attachments:

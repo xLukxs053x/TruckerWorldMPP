@@ -10,7 +10,7 @@ from truckerworld_bot.database import TicketRecord
 
 
 @pytest.mark.asyncio
-async def test_mapped_message_uses_platform_status_when_local_ticket_is_closed(monkeypatch) -> None:
+async def test_mapped_message_is_ignored_when_discord_ticket_is_closed(monkeypatch) -> None:
     class FakeTextChannel:
         id = 300
 
@@ -33,16 +33,10 @@ async def test_mapped_message_uses_platform_status_when_local_ticket_is_closed(m
         id=500,
         author=SimpleNamespace(id=400, bot=False),
         channel=FakeTextChannel(),
-        content="This must appear in TWMP Support.",
+        content="This must not appear in TWMP Support.",
         attachments=[],
     )
 
     await bot_module.TruckerWorldBot.on_message(bot, message)
 
-    platform.sync_discord_message.assert_awaited_once_with(
-        ticket.platform_ticket_id,
-        discord_user_id=400,
-        body="This must appear in TWMP Support.",
-        external_message_id=500,
-        attachment_urls=[],
-    )
+    platform.sync_discord_message.assert_not_awaited()

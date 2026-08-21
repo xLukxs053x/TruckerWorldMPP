@@ -43,12 +43,12 @@ class CommunityCog(commands.GroupCog, group_name="ticket", group_description="Di
         )
         embed.add_field(
             name="One continuous support case",
-            value="Use your existing ticket whenever possible. Tickets closed within the last 20 days can be reopened directly in TWMP Support.",
+            value="Use your existing case whenever possible. Once it continues in TWMP Support on the website, the Discord ticket is locked and all further replies are sent there.",
             inline=False,
         )
         embed.add_field(
             name="Private transcript",
-            value="The conversation is synchronized with your TWMP account. Closing the ticket creates a private PDF transcript in TWMP Support.",
+            value="The Discord request is attached to your TWMP account. Its private history remains available with the support case when the conversation moves to the website.",
             inline=False,
         )
         embed.add_field(
