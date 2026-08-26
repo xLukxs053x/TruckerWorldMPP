@@ -20,6 +20,7 @@ selection.
 - Discord-to-web support handoff: the Discord channel locks when the conversation continues in TWMP Support
 - protected PDF transcripts and web-only reopening of the same closed ticket within a 20-day window
 - Discord warnings, timeouts, timeout removal, and message cleanup
+- custom Markdown announcement embeds with image uploads, thumbnails, role pings, and ghost pings
 - complete per-guild setup through `/admin`
 - SQLite with WAL mode for guild settings, tickets, and Discord warnings
 
@@ -82,6 +83,7 @@ The bot needs these permissions:
 - View Channels, Send Messages, Embed Links, Attach Files, and Read Message History
 - Manage Channels for private tickets
 - Manage Messages for `/mod clear`
+- Mention Everyone to ping roles that are not configured as mentionable
 - Moderate Members for Discord timeouts
 
 The bot can generate the correct installation link with `/admin invite`.
@@ -149,6 +151,17 @@ service login.
 - `/admin reset`
 - `/admin ticket-panel`
 - `/admin invite`
+
+### `/embed`
+
+- `/embed create` — opens the announcement editor after choosing a channel, optional role, image, and thumbnail
+- `/embed guide` — shows a Markdown example and explains role notifications
+
+`/embed create` requires Manage Server. Its multi-line content supports Discord Markdown such as headings, bold text,
+links, lists, quotes, and code. A selected role is the only mention the bot permits. With `ghost_ping:true`, members
+are notified and the bot immediately removes the visible role mention while keeping the announcement itself online.
+Pinging a role that is not configured as mentionable requires the Mention Everyone permission for both the author
+and the bot.
 
 ## Environment variables
 

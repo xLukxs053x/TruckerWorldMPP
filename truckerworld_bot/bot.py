@@ -40,6 +40,7 @@ class TruckerWorldBot(commands.Bot):
     async def setup_hook(self) -> None:
         from .cogs.admin import AdminCog
         from .cogs.community import CommunityCog
+        from .cogs.embed_builder import EmbedBuilderCog
         from .cogs.moderation import ModerationCog
         from .cogs.platform import PlatformCog
         from .cogs.tasks import BackgroundTasksCog
@@ -52,6 +53,7 @@ class TruckerWorldBot(commands.Bot):
         await self.add_cog(PlatformCog(self))
         await self.add_cog(CommunityCog(self))
         await self.add_cog(ModerationCog(self))
+        await self.add_cog(EmbedBuilderCog(self))
         await self.add_cog(AdminCog(self))
         await self.add_cog(BackgroundTasksCog(self))
 
@@ -158,6 +160,7 @@ class TruckerWorldBot(commands.Bot):
             read_message_history=True,
             manage_channels=True,
             manage_messages=True,
+            mention_everyone=True,
             moderate_members=True,
         )
         return discord.utils.oauth_url(
